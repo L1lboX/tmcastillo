@@ -16,27 +16,29 @@
     <meta name="theme-color" content="#0b1120">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     @vite(['resources/css/public.css', 'resources/js/public.js'])
 </head>
-<body class="bg-[#0b1120] text-white antialiased" style="overflow: hidden;">
+<body class="bg-[#080d1a] text-white antialiased" style="overflow: hidden;">
 
     <div class="loader" id="page-loader">
         <div class="flex flex-col items-center">
-            <div class="loader-truck"></div>
-            <div class="loader-text">Cargando...</div>
+            <div class="loader-logo">TC</div>
+            <div class="loader-bar">
+                <div class="loader-progress"></div>
+            </div>
         </div>
     </div>
 
     <nav class="navbar fixed top-0 left-0 w-full z-50 px-4 sm:px-6 lg:px-10 py-4" id="navbar">
         <div class="max-w-7xl mx-auto flex items-center justify-between">
             <a href="#" class="flex items-center gap-3 text-white no-underline">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#c9952b] to-[#e8c06a] flex items-center justify-center font-bold text-[#0b1120] text-sm">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-brand-gold to-brand-gold-light flex items-center justify-center font-black text-brand-dark text-sm tracking-wider shadow-[0_4px_12px_rgba(197,160,67,0.25)]">
                     TC
                 </div>
                 <div>
-                    <div class="text-base font-bold leading-tight">Transporte Castillo</div>
-                    <div class="text-[11px] text-white/40 tracking-widest uppercase">Transporte & Logística</div>
+                    <div class="text-base font-bold leading-tight tracking-tight">Transporte Castillo</div>
+                    <div class="text-[10px] text-white/35 tracking-widest uppercase font-semibold">Transporte & Logística</div>
                 </div>
             </a>
 
@@ -76,40 +78,54 @@
         <a href="{{ route('login') }}" class="btn-primary !mt-4">Acceso interno</a>
     </div>
 
-    <section id="inicio" class="relative min-h-[84vh] flex items-center overflow-hidden hero-gradient">
-        <div class="absolute inset-0">
-            <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=1920&q=80')] bg-cover bg-center bg-no-repeat opacity-30"></div>
+    <section id="inicio" class="relative min-h-screen lg:min-h-[92vh] flex items-center overflow-hidden hero-gradient">
+        <div class="absolute inset-0" aria-hidden="true">
             <div class="hero-overlay absolute inset-0"></div>
         </div>
 
         <canvas id="particles-canvas" aria-hidden="true"></canvas>
 
-        <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 w-full">
-            <div class="max-w-3xl">
-                <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-[#e8c06a] text-xs font-semibold tracking-widest uppercase mb-6 fade-in visible">
-                    Excelencia en transporte desde 2015
+        <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 w-full pt-28 pb-20 lg:pt-24 lg:pb-16">
+            <div class="hero-layout">
+                <div class="hero-copy max-w-2xl">
+                    <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-brand-gold text-[10px] font-semibold tracking-widest uppercase mb-6 fade-in visible">
+                        <span class="w-2 h-2 rounded-full bg-brand-gold animate-pulse shadow-[0_0_8px_var(--color-brand-gold)]"></span>
+                        Excelencia en transporte desde 2015
+                    </div>
+
+                    <h1 class="hero-title text-4xl sm:text-6xl lg:text-6xl xl:text-7xl font-black leading-[0.95] mb-6 tracking-normal fade-in visible" style="transition-delay: 0.1s;">
+                        <span class="block">Transporte de Carga</span>
+                        <span class="gradient-text block">Nacional</span>
+                        <span class="block">Rápido & Seguro</span>
+                    </h1>
+
+                    <p class="text-base sm:text-lg text-white/55 max-w-xl mb-10 leading-relaxed fade-in visible" style="transition-delay: 0.2s;">
+                        Soluciones logísticas integrales con cobertura nacional.
+                        Más de 9 años transportando el progreso de Perú con profesionalismo,
+                        puntualidad y total seguridad.
+                    </p>
+
+                    <div class="flex flex-wrap gap-4 fade-in visible" style="transition-delay: 0.3s;">
+                        <a href="#contacto" class="btn-primary">
+                            Solicitar cotización
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+                            </svg>
+                        </a>
+                        <a href="#servicios" class="btn-primary-outline">Nuestros servicios</a>
+                    </div>
                 </div>
 
-                <h1 class="hero-title text-4xl sm:text-5xl lg:text-7xl font-extrabold leading-[1.05] mb-6 fade-in visible" style="transition-delay: 0.1s;">
-                    Transporte de Carga
-                    <span class="gradient-text">Nacional</span>
-                    <br>Rápido & Seguro
-                </h1>
-
-                <p class="text-lg sm:text-xl text-white/60 max-w-xl mb-10 fade-in visible" style="transition-delay: 0.2s;">
-                    Soluciones logísticas integrales con cobertura nacional. 
-                    Más de 9 años transportando la carga de Perú con profesionalismo, 
-                    puntualidad y total seguridad.
-                </p>
-
-                <div class="flex flex-wrap gap-4 fade-in visible" style="transition-delay: 0.3s;">
-                    <a href="#contacto" class="btn-primary">
-                        Solicitar cotización
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
-                        </svg>
-                    </a>
-                    <a href="#servicios" class="btn-primary-outline">Nuestros servicios</a>
+                <div class="hero-visual fade-in visible" style="transition-delay: 0.2s;">
+                    <div class="hero-vehicle-frame">
+                        <img src="{{ asset('images/fleet/heavy-truck-road.jpg') }}" alt="Camión de carga en ruta nacional" class="hero-vehicle-image" fetchpriority="high" decoding="async">
+                    </div>
+                    <div class="hero-vehicle-badge hero-vehicle-badge-top">
+                        <span>Ruta nacional</span>
+                    </div>
+                    <div class="hero-vehicle-badge hero-vehicle-badge-bottom">
+                        <span>Monitoreo 24/7</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -120,83 +136,82 @@
         </div>
     </section>
 
-    <section id="nosotros" class="pt-12 pb-24 sm:pt-16 sm:pb-32 px-4 sm:px-6 lg:px-10 section-bg-dark">
+    <section id="nosotros" class="pt-24 pb-28 sm:pt-32 sm:pb-40 px-4 sm:px-6 lg:px-10 section-bg-dark">
         <div class="max-w-7xl mx-auto">
             <div class="grid lg:grid-cols-2 gap-16 items-center">
-                <div class="fade-in-left visible">
-                    <span class="inline-block text-[#c9952b] text-xs font-semibold tracking-[0.2em] uppercase mb-4">Quiénes somos</span>
-                    <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight mb-6">
+                <div class="fade-in-left">
+                    <span class="inline-block text-brand-gold text-[10px] font-semibold tracking-[0.2em] uppercase mb-4">Quiénes somos</span>
+                    <h2 class="text-3xl sm:text-4xl lg:text-5xl font-black leading-[1.1] mb-6 tracking-tight">
                         Más de 9 años
                         <span class="gradient-text">transportando</span><br>
                         el progreso de Perú
                     </h2>
                     <div class="gold-line mb-8"></div>
 
-                    <div class="space-y-5 text-white/60 leading-relaxed">
+                    <div class="space-y-6 text-white/50 leading-relaxed text-sm sm:text-base">
                         <p>
                             <strong class="text-white font-semibold">Transporte Castillo</strong> nació con la visión de 
-                            convertirse en un referente del transporte de carga nacional en Perú. Desde nuestros inicios, 
-                            hemos construido una operación basada en la confianza, la puntualidad y el compromiso 
-                            absoluto con la seguridad de cada carga que transportamos.
+                            convertirse en un referente del transporte de carga nacional en el país. Desde nuestros inicios, 
+                            hemos construido una operación sólida basada en la confianza absoluta, la puntualidad estricta y el compromiso 
+                            con la seguridad.
                         </p>
                         <p>
-                            Contamos con una flota moderna y diversificada de unidades de carga pesada, 
-                            liviana y distribución urbana, operando desde nuestra base principal con cobertura 
-                            a nivel nacional. Cada envío es tratado con la rigurosidad de un proceso 
-                            logístico profesional, respaldado por tecnología de monitoreo y seguimiento.
+                            Contamos con una flota moderna y diversificada de unidades operadas por profesionales logísticos calificados, 
+                            conectando Lima con todas las regiones del país. Cada envío es gestionado bajo rigurosos protocolos, 
+                            respaldado por tecnología de monitoreo satelital en tiempo real.
                         </p>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-6 mt-10">
-                        <div class="flex items-start gap-4">
-                            <div class="w-10 h-10 rounded-lg bg-[#c9952b]/10 flex items-center justify-center text-[#c9952b] flex-shrink-0">
+                    <div class="grid sm:grid-cols-2 gap-6 mt-10">
+                        <div class="flex items-start gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-brand-gold/20 transition-all duration-300">
+                            <div class="w-10 h-10 rounded-lg bg-brand-gold/10 flex items-center justify-center text-brand-gold flex-shrink-0 shadow-[0_0_15px_rgba(197,160,67,0.1)]">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                 </svg>
                             </div>
                             <div>
-                                <div class="font-semibold text-white text-sm">Misión</div>
-                                <p class="text-xs text-white/40 mt-1">Ofrecer soluciones de transporte confiables que impulsen el éxito de nuestros clientes.</p>
+                                <div class="font-bold text-white text-sm tracking-tight">Misión</div>
+                                <p class="text-xs text-white/40 mt-1 leading-relaxed">Ofrecer soluciones de transporte confiables y personalizadas que impulsen el éxito de cada uno de nuestros clientes.</p>
                             </div>
                         </div>
-                        <div class="flex items-start gap-4">
-                            <div class="w-10 h-10 rounded-lg bg-[#c9952b]/10 flex items-center justify-center text-[#c9952b] flex-shrink-0">
+                        <div class="flex items-start gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-brand-gold/20 transition-all duration-300">
+                            <div class="w-10 h-10 rounded-lg bg-brand-gold/10 flex items-center justify-center text-brand-gold flex-shrink-0 shadow-[0_0_15px_rgba(197,160,67,0.1)]">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
                                 </svg>
                             </div>
                             <div>
-                                <div class="font-semibold text-white text-sm">Visión</div>
-                                <p class="text-xs text-white/40 mt-1">Ser la empresa de transporte de carga más confiable y eficiente del Perú.</p>
+                                <div class="font-bold text-white text-sm tracking-tight">Visión</div>
+                                <p class="text-xs text-white/40 mt-1 leading-relaxed">Consolidarnos como el socio logístico más confiable, eficiente e innovador del Perú, impulsados por la excelencia operativa.</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <div class="fade-in-right">
-                    <div class="relative">
-                        <div class="aspect-[4/3] rounded-2xl overflow-hidden">
-                            <img src="https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=800&q=80" alt="Flota Transporte Castillo" class="w-full h-full object-cover" loading="lazy">
+                    <div class="relative pl-6 pb-6">
+                        <div class="aspect-[4/3] rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.4)]">
+                            <img src="https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800&q=80" alt="Almacén de Transporte Castillo" class="w-full h-full object-cover hover:scale-105 transition-transform duration-700" loading="lazy">
                         </div>
-                        <div class="absolute -bottom-6 -left-6 bg-gradient-to-br from-[#c9952b] to-[#e8c06a] rounded-2xl p-6 shadow-2xl hidden sm:block">
-                            <div class="text-[#0b1120] font-bold text-3xl">9+</div>
-                            <div class="text-[#0b1120]/70 text-sm font-medium">Años de experiencia</div>
+                        <div class="absolute bottom-0 left-0 bg-gradient-to-br from-brand-gold to-brand-gold-light rounded-xl p-5 shadow-2xl hidden sm:block border border-white/10">
+                            <div class="text-brand-dark font-black text-3xl leading-none">9+</div>
+                            <div class="text-brand-dark/70 text-xs font-semibold uppercase tracking-wider mt-1">Años de trayectoria</div>
                         </div>
-                        <div class="absolute -top-4 -right-4 w-full h-full rounded-2xl border border-[#c9952b]/20 -z-10"></div>
+                        <div class="absolute -top-3 right-3 -bottom-3 -left-3 rounded-2xl border border-brand-gold/20 -z-10"></div>
                     </div>
 
-                    <div class="grid grid-cols-3 gap-4 mt-10">
-                        <div class="text-center p-4 rounded-xl bg-white/[0.02] border border-white/5">
-                            <div class="text-2xl font-bold gradient-text">+500</div>
-                            <div class="text-xs text-white/40 mt-1">Clientes atendidos</div>
+                    <div class="grid grid-cols-3 gap-4 mt-12">
+                        <div class="text-center p-5 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] hover:border-brand-gold/15 transition-all duration-300">
+                            <div class="text-2xl sm:text-3xl font-black gradient-text tracking-tight">+500</div>
+                            <div class="text-[10px] text-white/35 font-semibold uppercase tracking-wider mt-1">Clientes</div>
                         </div>
-                        <div class="text-center p-4 rounded-xl bg-white/[0.02] border border-white/5">
-                            <div class="text-2xl font-bold gradient-text">+3K</div>
-                            <div class="text-xs text-white/40 mt-1">Envíos realizados</div>
+                        <div class="text-center p-5 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] hover:border-brand-gold/15 transition-all duration-300">
+                            <div class="text-2xl sm:text-3xl font-black gradient-text tracking-tight">+3K</div>
+                            <div class="text-[10px] text-white/35 font-semibold uppercase tracking-wider mt-1">Envíos</div>
                         </div>
-                        <div class="text-center p-4 rounded-xl bg-white/[0.02] border border-white/5">
-                            <div class="text-2xl font-bold gradient-text">24/7</div>
-                            <div class="text-xs text-white/40 mt-1">Soporte logístico</div>
+                        <div class="text-center p-5 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] hover:border-brand-gold/15 transition-all duration-300">
+                            <div class="text-2xl sm:text-3xl font-black gradient-text tracking-tight">24/7</div>
+                            <div class="text-[10px] text-white/35 font-semibold uppercase tracking-wider mt-1">Soporte</div>
                         </div>
                     </div>
                 </div>
@@ -204,167 +219,271 @@
         </div>
     </section>
 
-    <section id="servicios" class="py-24 sm:py-32 px-4 sm:px-6 lg:px-10 section-bg-navy">
+    <section id="servicios" class="py-28 sm:py-36 px-4 sm:px-6 lg:px-10 section-bg-light">
         <div class="max-w-7xl mx-auto">
-            <div class="text-center mb-16 fade-in">
-                <span class="inline-block text-[#c9952b] text-xs font-semibold tracking-[0.2em] uppercase mb-4">Nuestra oferta</span>
-                <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4">
+            <div class="text-center mb-20 fade-in">
+                <span class="inline-block text-brand-gold text-[10px] font-semibold tracking-[0.2em] uppercase mb-4">Nuestra oferta premium</span>
+                <h2 class="text-3xl sm:text-5xl lg:text-6xl font-black leading-[1.1] mb-6 tracking-tight">
                     Servicios <span class="gradient-text">Logísticos</span>
                 </h2>
-                <p class="text-white/50 max-w-xl mx-auto text-lg">
-                    Soluciones integrales de transporte diseñadas para empresas que exigen profesionalismo y resultados.
+                <p class="text-white/50 max-w-2xl mx-auto text-base sm:text-lg leading-relaxed">
+                    Soluciones corporativas de alta precisión diseñadas para superar los estándares logísticos más exigentes del país.
                 </p>
-                <div class="gold-line-center mt-6"></div>
+                <div class="gold-line-center mt-8"></div>
             </div>
 
-            <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 stagger-children">
-                <div class="service-card glass-card rounded-2xl p-8">
-                    <div class="service-icon mb-5 text-[#c9952b]">
-                        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-1l-3-3H5a2 2 0 00-2 2z"/>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 13h4l2 2h3"/>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 17a2 2 0 100-4 2 2 0 000 4z"/>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 17a2 2 0 100-4 2 2 0 000 4z"/>
+            <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 stagger-children">
+                <!-- Servicio 1 -->
+                <div class="service-card glass-card rounded-2xl p-8 border border-white/5 bg-white/[0.01] hover:border-brand-gold/30 hover:bg-brand-dark/40 transition-all duration-500">
+                    <div class="service-icon mb-6 text-brand-gold">
+                        <svg class="w-12 h-12" width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="grad-nacional" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#c5a043" />
+                                    <stop offset="100%" stop-color="#f3e5ab" />
+                                </linearGradient>
+                            </defs>
+                            <path d="M17 18H18C18.5523 18 19 17.5523 19 17V11H14V17C14 17.5523 14.4477 18 15 18H16" stroke="url(#grad-nacional)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M14 11H19L21.5 14H19" stroke="url(#grad-nacional)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M2 17V7C2 6.44772 2.44772 6 3 6H13C13.5523 6 14 6.44772 14 7V17C14 17.5523 13.5523 18 13 18H2V17Z" stroke="url(#grad-nacional)" stroke-width="1.5" stroke-linejoin="round"/>
+                            <circle cx="5.5" cy="18.5" r="1.5" fill="#c5a043"/>
+                            <circle cx="10.5" cy="18.5" r="1.5" fill="#c5a043"/>
+                            <circle cx="17.5" cy="18.5" r="1.5" fill="#c5a043"/>
+                            <path d="M6 10H10" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" stroke-linecap="round"/>
                         </svg>
                     </div>
-                    <h3 class="text-lg font-bold mb-3">Transporte de Carga Nacional</h3>
+                    <h3 class="text-xl font-bold mb-4 text-white transition-colors">Transporte de Carga Nacional</h3>
                     <p class="text-white/45 text-sm leading-relaxed">
-                        Servicio de transporte terrestre a nivel nacional con cobertura en todas las regiones del Perú. Carga general, paletizada y sobredimensionada.
+                        Servicio de transporte terrestre a nivel nacional con cobertura en todas las regiones del Perú. Especialistas en carga general, paletizada y sobredimensionada con puntualidad certificada.
                     </p>
                 </div>
 
-                <div class="service-card glass-card rounded-2xl p-8">
-                    <div class="service-icon mb-5 text-[#c9952b]">
-                        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8"/>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6"/>
+                <!-- Servicio 2 -->
+                <div class="service-card glass-card rounded-2xl p-8 border border-white/5 bg-white/[0.01] hover:border-brand-gold/30 hover:bg-brand-dark/40 transition-all duration-500">
+                    <div class="service-icon mb-6 text-brand-gold">
+                        <svg class="w-12 h-12" width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="grad-pesado" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#c5a043" />
+                                    <stop offset="100%" stop-color="#f3e5ab" />
+                                </linearGradient>
+                            </defs>
+                            <path d="M4 18V8C4 7.44772 4.44772 7 5 7H14C14.5523 7 15 7.44772 15 8V18" stroke="url(#grad-pesado)" stroke-width="1.5" stroke-linecap="round"/>
+                            <path d="M15 11H20C20.5523 11 21 11.4477 21 12V18" stroke="url(#grad-pesado)" stroke-width="1.5" stroke-linecap="round"/>
+                            <circle cx="7.5" cy="18.5" r="1.5" fill="#c5a043"/>
+                            <circle cx="12.5" cy="18.5" r="1.5" fill="#c5a043"/>
+                            <circle cx="17.5" cy="18.5" r="1.5" fill="#c5a043"/>
+                            <path d="M8 11H11" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" stroke-linecap="round"/>
+                            <path d="M1 18H23" stroke="url(#grad-pesado)" stroke-width="1.5" stroke-linecap="round"/>
                         </svg>
                     </div>
-                    <h3 class="text-lg font-bold mb-3">Transporte Pesado</h3>
+                    <h3 class="text-xl font-bold mb-4 text-white transition-colors">Transporte Pesado</h3>
                     <p class="text-white/45 text-sm leading-relaxed">
-                        Unidades especializadas para carga de alto tonelaje. Equipos de arrastre, plataformas y camiones con capacidad para cargas industriales.
+                        Unidades de alto tonelaje configuradas para la industria. Plataformas, camas bajas y camiones listos para transportar maquinaria pesada y cargas sobredimensionadas con máxima rigurosidad técnica.
                     </p>
                 </div>
 
-                <div class="service-card glass-card rounded-2xl p-8">
-                    <div class="service-icon mb-5 text-[#c9952b]">
-                        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                <!-- Servicio 3 -->
+                <div class="service-card glass-card rounded-2xl p-8 border border-white/5 bg-white/[0.01] hover:border-brand-gold/30 hover:bg-brand-dark/40 transition-all duration-500">
+                    <div class="service-icon mb-6 text-brand-gold">
+                        <svg class="w-12 h-12" width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="grad-logistica" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#c5a043" />
+                                    <stop offset="100%" stop-color="#f3e5ab" />
+                                </linearGradient>
+                            </defs>
+                            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="url(#grad-logistica)" stroke-width="1.5" stroke-linejoin="round"/>
+                            <path d="M2 17L12 22L22 17" stroke="url(#grad-logistica)" stroke-width="1.5" stroke-linejoin="round"/>
+                            <path d="M2 12L12 17L22 12" stroke="url(#grad-logistica)" stroke-width="1.5" stroke-linejoin="round"/>
                         </svg>
                     </div>
-                    <h3 class="text-lg font-bold mb-3">Logística & Distribución</h3>
+                    <h3 class="text-xl font-bold mb-4 text-white transition-colors">Logística & Distribución</h3>
                     <p class="text-white/45 text-sm leading-relaxed">
-                        Gestión integral de cadena de suministro, almacenamiento temporal, consolidación de carga y distribución capilar en zonas urbanas.
+                        Administración integral de la cadena de suministro: almacenamiento estratégico temporal, consolidación inteligente de mercadería y distribución capilar urbana ágil para sucursales o clientes finales.
                     </p>
                 </div>
 
-                <div class="service-card glass-card rounded-2xl p-8">
-                    <div class="service-icon mb-5 text-[#c9952b]">
-                        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                <!-- Servicio 4 -->
+                <div class="service-card glass-card rounded-2xl p-8 border border-white/5 bg-white/[0.01] hover:border-brand-gold/30 hover:bg-brand-dark/40 transition-all duration-500">
+                    <div class="service-icon mb-6 text-brand-gold">
+                        <svg class="w-12 h-12" width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="grad-segura" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#c5a043" />
+                                    <stop offset="100%" stop-color="#f3e5ab" />
+                                </linearGradient>
+                            </defs>
+                            <path d="M12 22C12 22 20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z" stroke="url(#grad-segura)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M9 11L11 13L15 9" stroke="url(#grad-segura)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
                     </div>
-                    <h3 class="text-lg font-bold mb-3">Carga Segura</h3>
+                    <h3 class="text-xl font-bold mb-4 text-white transition-colors">Carga Segura</h3>
                     <p class="text-white/45 text-sm leading-relaxed">
-                        Protocolos de sujeción, embalaje y aseguramiento de carga. Monitoreo de temperatura, humedad y golpes para carga sensible.
+                        Protocolos avanzados de estiba, trincaje e inmovilización física de carga. Monitoreo constante de vibraciones, estanqueidad y resguardo blindado para cargamento de altísimo valor comercial.
                     </p>
                 </div>
 
-                <div class="service-card glass-card rounded-2xl p-8">
-                    <div class="service-icon mb-5 text-[#c9952b]">
-                        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                <!-- Servicio 5 -->
+                <div class="service-card glass-card rounded-2xl p-8 border border-white/5 bg-white/[0.01] hover:border-brand-gold/30 hover:bg-brand-dark/40 transition-all duration-500">
+                    <div class="service-icon mb-6 text-brand-gold">
+                        <svg class="w-12 h-12" width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="grad-monitoreo" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#c5a043" />
+                                    <stop offset="100%" stop-color="#f3e5ab" />
+                                </linearGradient>
+                            </defs>
+                            <circle cx="12" cy="12" r="10" stroke="url(#grad-monitoreo)" stroke-width="1.5"/>
+                            <circle cx="12" cy="12" r="4" stroke="url(#grad-monitoreo)" stroke-width="1.5"/>
+                            <path d="M12 2V6" stroke="#c5a043" stroke-width="1.5"/>
+                            <path d="M12 18V22" stroke="#c5a043" stroke-width="1.5"/>
+                            <path d="M2 12H6" stroke="#c5a043" stroke-width="1.5"/>
+                            <path d="M18 12H22" stroke="#c5a043" stroke-width="1.5"/>
                         </svg>
                     </div>
-                    <h3 class="text-lg font-bold mb-3">Monitoreo & Seguimiento</h3>
+                    <h3 class="text-xl font-bold mb-4 text-white transition-colors">Monitoreo & Seguimiento</h3>
                     <p class="text-white/45 text-sm leading-relaxed">
-                        Sistema de rastreo GPS en tiempo real. Notificaciones de estado, reportes de entrega y visibilidad completa de tu carga 24/7.
+                        Acceso a plataforma GPS de última generación. Seguimiento satelital ininterrumpido en tiempo real, alertas de desvío de ruta y reporte digital instantáneo con confirmaciones digitales.
                     </p>
                 </div>
 
-                <div class="service-card glass-card rounded-2xl p-8">
-                    <div class="service-icon mb-5 text-[#c9952b]">
-                        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+                <!-- Servicio 6 -->
+                <div class="service-card glass-card rounded-2xl p-8 border border-white/5 bg-white/[0.01] hover:border-brand-gold/30 hover:bg-brand-dark/40 transition-all duration-500">
+                    <div class="service-icon mb-6 text-brand-gold">
+                        <svg class="w-12 h-12" width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="grad-rutas" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#c5a043" />
+                                    <stop offset="100%" stop-color="#f3e5ab" />
+                                </linearGradient>
+                            </defs>
+                            <path d="M9 20L3 17V4L9 7M9 20L15 17M9 20V7M15 17L21 20V7L15 4M15 17V4M9 7L15 4" stroke="url(#grad-rutas)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
                     </div>
-                    <h3 class="text-lg font-bold mb-3">Rutas Nacionales</h3>
+                    <h3 class="text-xl font-bold mb-4 text-white transition-colors">Rutas Nacionales</h3>
                     <p class="text-white/45 text-sm leading-relaxed">
-                        Cobertura en rutas principales: Lima, Arequipa, Trujillo, Chiclayo, Piura, Cusco, Huancayo y todas las regiones del Perú.
+                        Conectividad fluida por las principales arterias viales de la Costa, Sierra y Selva. Rutas troncales optimizadas de Lima a Arequipa, Trujillo, Piura, Cusco, Iquitos y más regiones del país.
                     </p>
                 </div>
             </div>
         </div>
     </section>
 
-    <section id="flota" class="py-24 sm:py-32 px-4 sm:px-6 lg:px-10 section-bg-dark">
+    <section id="flota" class="py-28 sm:py-36 px-4 sm:px-6 lg:px-10 section-bg-dark">
         <div class="max-w-7xl mx-auto">
-            <div class="text-center mb-16 fade-in">
-                <span class="inline-block text-[#c9952b] text-xs font-semibold tracking-[0.2em] uppercase mb-4">Nuestra flota</span>
-                <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4">
+            <div class="text-center mb-12 fade-in">
+                <span class="inline-block text-brand-gold text-[10px] font-semibold tracking-[0.2em] uppercase mb-4">Nuestra flota</span>
+                <h2 class="text-3xl sm:text-5xl lg:text-6xl font-black leading-[1.1] mb-6 tracking-tight">
                     Unidades <span class="gradient-text">Modernas</span>
                 </h2>
-                <p class="text-white/50 max-w-xl mx-auto text-lg">
-                    Flota diversificada y en óptimas condiciones para garantizar la seguridad y eficiencia de cada operación.
+                <p class="text-white/50 max-w-2xl mx-auto text-base sm:text-lg leading-relaxed">
+                    Flota diversificada en óptimas condiciones operativas y equipada con tecnología de punta para garantizar la eficiencia.
                 </p>
-                <div class="gold-line-center mt-6"></div>
+                <div class="gold-line-center mt-8"></div>
             </div>
 
-            <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4" id="gallery-grid">
-                <div class="gallery-item rounded-xl aspect-[4/3]">
-                    <img src="https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?w=600&q=80" alt="Camión de carga" class="w-full h-full object-cover" loading="lazy">
-                    <div class="gallery-overlay">
-                        <span class="text-white font-medium">Camiones de carga</span>
+            <!-- Filtros de la Flota -->
+            <div class="flex flex-wrap justify-center gap-3 mb-16 fade-in">
+                <button class="filter-btn active px-6 py-2.5 rounded-full text-xs font-semibold uppercase tracking-wider transition-all duration-300 border border-white/5 bg-white/5 text-white cursor-pointer hover:border-brand-gold/30" data-filter="all">
+                    Todas
+                </button>
+                <button class="filter-btn px-6 py-2.5 rounded-full text-xs font-semibold uppercase tracking-wider transition-all duration-300 border border-white/5 bg-transparent text-white/60 cursor-pointer hover:border-brand-gold/30 hover:text-white" data-filter="carga-pesada">
+                    Carga Pesada
+                </button>
+                <button class="filter-btn px-6 py-2.5 rounded-full text-xs font-semibold uppercase tracking-wider transition-all duration-300 border border-white/5 bg-transparent text-white/60 cursor-pointer hover:border-brand-gold/30 hover:text-white" data-filter="distribucion">
+                    Distribución
+                </button>
+                <button class="filter-btn px-6 py-2.5 rounded-full text-xs font-semibold uppercase tracking-wider transition-all duration-300 border border-white/5 bg-transparent text-white/60 cursor-pointer hover:border-brand-gold/30 hover:text-white" data-filter="logistica">
+                    Logística
+                </button>
+            </div>
+
+            <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6" id="gallery-grid">
+                <!-- Item 1 -->
+                <div class="gallery-item rounded-2xl overflow-hidden aspect-[4/3] relative group border border-white/5 shadow-lg bg-white/[0.01] transition-all duration-500" data-category="carga-pesada">
+                    <img src="{{ asset('images/fleet/heavy-truck-road.jpg') }}" alt="Tractor Scania Carga Pesada" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" loading="lazy" decoding="async">
+                    <div class="absolute inset-0 bg-gradient-to-t from-brand-dark via-brand-dark/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-6">
+                        <span class="text-brand-gold text-[9px] font-bold uppercase tracking-wider mb-2">Carga Pesada</span>
+                        <h4 class="text-white font-bold text-base mb-1 leading-tight">Camión Escala Premium</h4>
+                        <p class="text-white/60 text-[11px] leading-relaxed">Configuración Scania para rutas nacionales.</p>
                     </div>
                 </div>
-                <div class="gallery-item rounded-xl aspect-[4/3]">
-                    <img src="https://images.unsplash.com/photo-1517315003714-a7190f2cd877?w=600&q=80" alt="Flota de transporte" class="w-full h-full object-cover" loading="lazy">
-                    <div class="gallery-overlay">
-                        <span class="text-white font-medium">Flota corporativa</span>
+
+                <!-- Item 2 -->
+                <div class="gallery-item rounded-2xl overflow-hidden aspect-[4/3] relative group border border-white/5 shadow-lg bg-white/[0.01] transition-all duration-500" data-category="logistica">
+                    <img src="{{ asset('images/fleet/warehouse-operations.jpg') }}" alt="Almacén Logístico Integrado" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" loading="lazy" decoding="async">
+                    <div class="absolute inset-0 bg-gradient-to-t from-brand-dark via-brand-dark/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-6">
+                        <span class="text-brand-gold text-[9px] font-bold uppercase tracking-wider mb-2">Logística</span>
+                        <h4 class="text-white font-bold text-base mb-1 leading-tight">Centro de Consolidación</h4>
+                        <p class="text-white/60 text-[11px] leading-relaxed">Almacenamiento temporal seguro de mercaderías.</p>
                     </div>
                 </div>
-                <div class="gallery-item rounded-xl aspect-[4/3]">
-                    <img src="https://images.unsplash.com/photo-1623956098421-7875e4c3eb08?w=600&q=80" alt="Unidad de carga pesada" class="w-full h-full object-cover" loading="lazy">
-                    <div class="gallery-overlay">
-                        <span class="text-white font-medium">Carga pesada</span>
+
+                <!-- Item 3 -->
+                <div class="gallery-item rounded-2xl overflow-hidden aspect-[4/3] relative group border border-white/5 shadow-lg bg-white/[0.01] transition-all duration-500" data-category="carga-pesada">
+                    <img src="{{ asset('images/fleet/truck-warehouse-loading.jpg') }}" alt="Unidad de Carga Pesada en Muelle" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" loading="lazy" decoding="async">
+                    <div class="absolute inset-0 bg-gradient-to-t from-brand-dark via-brand-dark/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-6">
+                        <span class="text-brand-gold text-[9px] font-bold uppercase tracking-wider mb-2">Carga Pesada</span>
+                        <h4 class="text-white font-bold text-base mb-1 leading-tight">Remolque Multiejes</h4>
+                        <p class="text-white/60 text-[11px] leading-relaxed">Arrastre de plataformas sobredimensionadas.</p>
                     </div>
                 </div>
-                <div class="gallery-item rounded-xl aspect-[4/3]">
-                    <img src="https://images.unsplash.com/photo-1566576912324-6bb3f9d6e7c5?w=600&q=80" alt="Logística y distribución" class="w-full h-full object-cover" loading="lazy">
-                    <div class="gallery-overlay">
-                        <span class="text-white font-medium">Distribución</span>
+
+                <!-- Item 4 -->
+                <div class="gallery-item rounded-2xl overflow-hidden aspect-[4/3] relative group border border-white/5 shadow-lg bg-white/[0.01] transition-all duration-500" data-category="distribucion">
+                    <img src="{{ asset('images/fleet/distribution-fleet.jpg') }}" alt="Flotilla de Distribución" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" loading="lazy" decoding="async">
+                    <div class="absolute inset-0 bg-gradient-to-t from-brand-dark via-brand-dark/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-6">
+                        <span class="text-brand-gold text-[9px] font-bold uppercase tracking-wider mb-2">Distribución</span>
+                        <h4 class="text-white font-bold text-base mb-1 leading-tight">Flota Corporativa</h4>
+                        <p class="text-white/60 text-[11px] leading-relaxed">Reparto urbano y capilar con agilidad.</p>
                     </div>
                 </div>
-                <div class="gallery-item rounded-xl aspect-[4/3]">
-                    <img src="https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=600&q=80" alt="Vista de flota" class="w-full h-full object-cover" loading="lazy">
-                    <div class="gallery-overlay">
-                        <span class="text-white font-medium">Flota completa</span>
+
+                <!-- Item 5 -->
+                <div class="gallery-item rounded-2xl overflow-hidden aspect-[4/3] relative group border border-white/5 shadow-lg bg-white/[0.01] transition-all duration-500" data-category="carga-pesada">
+                    <img src="{{ asset('images/fleet/night-operations.jpg') }}" alt="Camión Pesado en Ruta" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" loading="lazy" decoding="async">
+                    <div class="absolute inset-0 bg-gradient-to-t from-brand-dark via-brand-dark/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-6">
+                        <span class="text-brand-gold text-[9px] font-bold uppercase tracking-wider mb-2">Carga Pesada</span>
+                        <h4 class="text-white font-bold text-base mb-1 leading-tight">Tractor Volvo FMX</h4>
+                        <p class="text-white/60 text-[11px] leading-relaxed">Preparado para las condiciones andinas más duras.</p>
                     </div>
                 </div>
-                <div class="gallery-item rounded-xl aspect-[4/3]">
-                    <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&q=80" alt="Truck frontal" class="w-full h-full object-cover" loading="lazy">
-                    <div class="gallery-overlay">
-                        <span class="text-white font-medium">Unidades operativas</span>
+
+                <!-- Item 6 -->
+                <div class="gallery-item rounded-2xl overflow-hidden aspect-[4/3] relative group border border-white/5 shadow-lg bg-white/[0.01] transition-all duration-500" data-category="distribucion">
+                    <img src="{{ asset('images/fleet/truck-highway-speed.jpg') }}" alt="Muelle de carga y descarga" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" loading="lazy" decoding="async">
+                    <div class="absolute inset-0 bg-gradient-to-t from-brand-dark via-brand-dark/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-6">
+                        <span class="text-brand-gold text-[9px] font-bold uppercase tracking-wider mb-2">Distribución</span>
+                        <h4 class="text-white font-bold text-base mb-1 leading-tight">Operación de Carga</h4>
+                        <p class="text-white/60 text-[11px] leading-relaxed">Flujo constante de mercadería optimizado.</p>
                     </div>
                 </div>
-                <div class="gallery-item rounded-xl aspect-[4/3]">
-                    <img src="https://images.unsplash.com/photo-1560493676-04071d6f3a5a?w=600&q=80" alt="Camión en ruta" class="w-full h-full object-cover" loading="lazy">
-                    <div class="gallery-overlay">
-                        <span class="text-white font-medium">Rutas nacionales</span>
+
+                <!-- Item 7 -->
+                <div class="gallery-item rounded-2xl overflow-hidden aspect-[4/3] relative group border border-white/5 shadow-lg bg-white/[0.01] transition-all duration-500" data-category="logistica">
+                    <img src="{{ asset('images/fleet/truck-on-road-pexels.jpg') }}" alt="Operaciones Logísticas de Almacén" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" loading="lazy" decoding="async">
+                    <div class="absolute inset-0 bg-gradient-to-t from-brand-dark via-brand-dark/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-6">
+                        <span class="text-brand-gold text-[9px] font-bold uppercase tracking-wider mb-2">Logística</span>
+                        <h4 class="text-white font-bold text-base mb-1 leading-tight">Gestión de Inventario</h4>
+                        <p class="text-white/60 text-[11px] leading-relaxed">Trazabilidad completa mediante software WMS.</p>
                     </div>
                 </div>
-                <div class="gallery-item rounded-xl aspect-[4/3]">
-                    <img src="https://images.unsplash.com/photo-1616298224927-7ec3c1b260e4?w=600&q=80" alt="Operación logística" class="w-full h-full object-cover" loading="lazy">
-                    <div class="gallery-overlay">
-                        <span class="text-white font-medium">Operaciones</span>
+
+                <!-- Item 8 -->
+                <div class="gallery-item rounded-2xl overflow-hidden aspect-[4/3] relative group border border-white/5 shadow-lg bg-white/[0.01] transition-all duration-500" data-category="carga-pesada">
+                    <img src="{{ asset('images/fleet/trucks-highway-sunset.jpg') }}" alt="Luces de Camión en la Noche" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" loading="lazy" decoding="async">
+                    <div class="absolute inset-0 bg-gradient-to-t from-brand-dark via-brand-dark/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-6">
+                        <span class="text-brand-gold text-[9px] font-bold uppercase tracking-wider mb-2">Carga Pesada</span>
+                        <h4 class="text-white font-bold text-base mb-1 leading-tight">Operación Nocturna 24/7</h4>
+                        <p class="text-white/60 text-[11px] leading-relaxed">Monitoreo continuo para tránsito ininterrumpido.</p>
                     </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <section id="ventajas" class="py-24 sm:py-32 px-4 sm:px-6 lg:px-10 section-bg-navy relative overflow-hidden">
+    <section id="ventajas" class="py-28 sm:py-36 px-4 sm:px-6 lg:px-10 section-bg-light relative overflow-hidden">
         <div class="absolute inset-0 opacity-[0.03]">
             <div class="absolute top-10 left-10 w-64 h-64 bg-[#c9952b] rounded-full blur-3xl"></div>
             <div class="absolute bottom-10 right-10 w-96 h-96 bg-[#c9952b] rounded-full blur-3xl"></div>
@@ -456,7 +575,7 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-6 mt-16 p-8 rounded-2xl bg-white/[0.02] border border-white/5">
+            <div class="premium-counters-container grid grid-cols-2 sm:grid-cols-4 gap-6 mt-16 p-8">
                 <div class="counter-item">
                     <div class="counter gradient-text" data-target="9" data-duration="1500">0</div>
                     <div class="counter-label">Años de experiencia</div>
@@ -477,103 +596,116 @@
         </div>
     </section>
 
-    <section class="py-24 sm:py-32 px-4 sm:px-6 lg:px-10 section-bg-dark">
-        <div class="max-w-7xl mx-auto">
-            <div class="text-center mb-16 fade-in">
-                <span class="inline-block text-[#c9952b] text-xs font-semibold tracking-[0.2em] uppercase mb-4">Confianza</span>
-                <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4">
+    <section id="testimonios" class="py-28 sm:py-36 px-4 sm:px-6 lg:px-10 section-bg-dark relative overflow-hidden">
+        <div class="absolute inset-0 opacity-[0.02] pointer-events-none">
+            <div class="absolute -top-24 -right-24 w-96 h-96 bg-brand-gold rounded-full blur-[120px]"></div>
+        </div>
+
+        <div class="max-w-7xl mx-auto relative z-10">
+            <div class="text-center mb-20 fade-in">
+                <span class="inline-block text-brand-gold text-[10px] font-semibold tracking-[0.2em] uppercase mb-4">Confianza</span>
+                <h2 class="text-3xl sm:text-5xl lg:text-6xl font-black leading-[1.1] mb-6 tracking-tight">
                     Lo que dicen <span class="gradient-text">nuestros clientes</span>
                 </h2>
-                <p class="text-white/50 max-w-xl mx-auto text-lg">
-                    La satisfacción de quienes confían en nosotros es nuestro mejor respaldo.
+                <p class="text-white/50 max-w-2xl mx-auto text-base sm:text-lg leading-relaxed">
+                    La satisfacción y confianza de las grandes empresas que respaldan nuestra impecable trayectoria.
                 </p>
-                <div class="gold-line-center mt-6"></div>
+                <div class="gold-line-center mt-8"></div>
             </div>
 
-            <div class="grid md:grid-cols-3 gap-6 stagger-children">
+            <div class="grid md:grid-cols-3 gap-8 stagger-children">
+                <!-- Testimonio 1 -->
                 <div class="testimonial-card">
-                    <div class="flex items-center gap-1 mb-4">
-                        <svg class="w-4 h-4 text-[#c9952b]" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <svg class="w-4 h-4 text-[#c9952b]" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <svg class="w-4 h-4 text-[#c9952b]" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <svg class="w-4 h-4 text-[#c9952b]" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <svg class="w-4 h-4 text-[#c9952b]" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                    <div class="flex items-center gap-1.5 mb-6">
+                        <svg class="w-4 h-4 text-brand-gold" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                        <svg class="w-4 h-4 text-brand-gold" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                        <svg class="w-4 h-4 text-brand-gold" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                        <svg class="w-4 h-4 text-brand-gold" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                        <svg class="w-4 h-4 text-brand-gold" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
                     </div>
-                    <p class="text-white/60 text-sm leading-relaxed mb-6">
-                        "Transporte Castillo ha sido un socio estratégico para nuestra distribución nacional. Su puntualidad y profesionalismo nos ha permitido crecer con tranquilidad."
+                    <p class="text-white/60 text-sm leading-relaxed mb-8 italic">
+                        "Transporte Castillo ha sido un socio estratégico clave para nuestra distribución nacional. Su puntualidad rigurosa y alto profesionalismo nos ha permitido expandirnos con absoluta tranquilidad."
                     </p>
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-[#c9952b]/30 to-[#e8c06a]/30 flex items-center justify-center text-sm font-bold text-[#e8c06a]">JD</div>
+                    <div class="flex items-center gap-4">
+                        <div class="testimonial-avatar-ring">
+                            <div class="w-10 h-10 rounded-full bg-[#030712] flex items-center justify-center text-sm font-bold text-brand-gold tracking-tight border border-white/5">JD</div>
+                        </div>
                         <div>
-                            <div class="text-sm font-semibold">Juan Delgado</div>
-                            <div class="text-xs text-white/40">Gerente Logístico - Corporación del Sur</div>
+                            <div class="text-sm font-bold text-white tracking-tight">Juan Delgado</div>
+                            <div class="text-[10px] text-white/35 font-medium uppercase tracking-wider mt-0.5">Gerente Logístico - Corporación del Sur</div>
                         </div>
                     </div>
                 </div>
 
+                <!-- Testimonio 2 -->
                 <div class="testimonial-card">
-                    <div class="flex items-center gap-1 mb-4">
-                        <svg class="w-4 h-4 text-[#c9952b]" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <svg class="w-4 h-4 text-[#c9952b]" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <svg class="w-4 h-4 text-[#c9952b]" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <svg class="w-4 h-4 text-[#c9952b]" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <svg class="w-4 h-4 text-[#c9952b]" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                    <div class="flex items-center gap-1.5 mb-6">
+                        <svg class="w-4 h-4 text-brand-gold" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                        <svg class="w-4 h-4 text-brand-gold" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                        <svg class="w-4 h-4 text-brand-gold" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                        <svg class="w-4 h-4 text-brand-gold" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                        <svg class="w-4 h-4 text-brand-gold" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
                     </div>
-                    <p class="text-white/60 text-sm leading-relaxed mb-6">
-                        "La seguridad con la que manejan cada envío es impresionante. Llevamos 3 años trabajando con ellos y nunca hemos tenido un incidente."
+                    <p class="text-white/60 text-sm leading-relaxed mb-8 italic">
+                        "La rigurosa seguridad con la que gestionan y resguardan cada uno de nuestros envíos es sobresaliente. Llevamos 3 años operando juntos y el resultado siempre ha sido impecable."
                     </p>
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-[#c9952b]/30 to-[#e8c06a]/30 flex items-center justify-center text-sm font-bold text-[#e8c06a]">MR</div>
+                    <div class="flex items-center gap-4">
+                        <div class="testimonial-avatar-ring">
+                            <div class="w-10 h-10 rounded-full bg-[#030712] flex items-center justify-center text-sm font-bold text-brand-gold tracking-tight border border-white/5">MR</div>
+                        </div>
                         <div>
-                            <div class="text-sm font-semibold">María Ríos</div>
-                            <div class="text-xs text-white/40">Jefa de Operaciones - Grupo Norte</div>
+                            <div class="text-sm font-bold text-white tracking-tight">María Ríos</div>
+                            <div class="text-[10px] text-white/35 font-medium uppercase tracking-wider mt-0.5">Jefa de Operaciones - Grupo Norte</div>
                         </div>
                     </div>
                 </div>
 
+                <!-- Testimonio 3 -->
                 <div class="testimonial-card">
-                    <div class="flex items-center gap-1 mb-4">
-                        <svg class="w-4 h-4 text-[#c9952b]" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <svg class="w-4 h-4 text-[#c9952b]" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <svg class="w-4 h-4 text-[#c9952b]" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <svg class="w-4 h-4 text-[#c9952b]" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <svg class="w-4 h-4 text-[#c9952b]" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                    <div class="flex items-center gap-1.5 mb-6">
+                        <svg class="w-4 h-4 text-brand-gold" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                        <svg class="w-4 h-4 text-brand-gold" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                        <svg class="w-4 h-4 text-brand-gold" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                        <svg class="w-4 h-4 text-brand-gold" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                        <svg class="w-4 h-4 text-brand-gold" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
                     </div>
-                    <p class="text-white/60 text-sm leading-relaxed mb-6">
-                        "El monitoreo en tiempo real de nuestras cargas nos da una tranquilidad invaluable. Transporte Castillo es sinónimo de confianza y eficiencia."
+                    <p class="text-white/60 text-sm leading-relaxed mb-8 italic">
+                        "El sistema de monitoreo satelital en tiempo real de nuestras cargas nos brinda una tranquilidad invaluable. Transporte Castillo es sinónimo de eficiencia, seguridad y total confianza."
                     </p>
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-[#c9952b]/30 to-[#e8c06a]/30 flex items-center justify-center text-sm font-bold text-[#e8c06a]">CP</div>
+                    <div class="flex items-center gap-4">
+                        <div class="testimonial-avatar-ring">
+                            <div class="w-10 h-10 rounded-full bg-[#030712] flex items-center justify-center text-sm font-bold text-brand-gold tracking-tight border border-white/5">CP</div>
+                        </div>
                         <div>
-                            <div class="text-sm font-semibold">Carlos Paredes</div>
-                            <div class="text-xs text-white/40">CEO - Importaciones del Pacífico</div>
+                            <div class="text-sm font-bold text-white tracking-tight">Carlos Paredes</div>
+                            <div class="text-[10px] text-white/35 font-medium uppercase tracking-wider mt-0.5">CEO - Importaciones del Pacífico</div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mt-16 fade-in">
-                <div class="trust-badge">
-                    <div class="badge-number">99.8%</div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mt-20 fade-in border-t border-white/5 pt-16">
+                <div class="trust-badge hover:scale-105 transition-all duration-300">
+                    <div class="badge-number gradient-text">99.8%</div>
                     <div class="badge-label">Entregas exitosas</div>
                 </div>
-                <div class="trust-badge">
-                    <div class="badge-number">+50</div>
+                <div class="trust-badge hover:scale-105 transition-all duration-300">
+                    <div class="badge-number gradient-text">+50</div>
                     <div class="badge-label">Empresas asociadas</div>
                 </div>
-                <div class="trust-badge">
-                    <div class="badge-number">15</div>
+                <div class="trust-badge hover:scale-105 transition-all duration-300">
+                    <div class="badge-number gradient-text">15</div>
                     <div class="badge-label">Unidades operativas</div>
                 </div>
-                <div class="trust-badge">
-                    <div class="badge-number">100%</div>
+                <div class="trust-badge hover:scale-105 transition-all duration-300">
+                    <div class="badge-number gradient-text">100%</div>
                     <div class="badge-label">Cobertura nacional</div>
                 </div>
             </div>
         </div>
     </section>
 
-    <section id="contacto" class="py-24 sm:py-32 px-4 sm:px-6 lg:px-10 section-bg-navy">
+    <section id="contacto" class="py-28 sm:py-36 px-4 sm:px-6 lg:px-10 section-bg-dark">
         <div class="max-w-7xl mx-auto">
             <div class="text-center mb-16 fade-in">
                 <span class="inline-block text-[#c9952b] text-xs font-semibold tracking-[0.2em] uppercase mb-4">Contacto</span>

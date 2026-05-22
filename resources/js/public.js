@@ -225,8 +225,59 @@ function initGallery() {
     const gallery = document.getElementById("gallery-grid");
     if (!gallery) return;
 
+    // Apply lazy loading to images
     const images = gallery.querySelectorAll("img");
     images.forEach((img) => {
         img.loading = "lazy";
+    });
+
+    const filterButtons = document.querySelectorAll(".filter-btn");
+    const galleryItems = gallery.querySelectorAll(".gallery-item");
+
+    if (!filterButtons.length || !galleryItems.length) return;
+
+    filterButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+            const filterValue = btn.getAttribute("data-filter");
+
+            // Update active state of buttons
+            filterButtons.forEach((b) => {
+                if (b === btn) {
+                    b.classList.add("active", "bg-white/5", "text-white");
+                    b.classList.remove("bg-transparent", "text-white/60");
+                } else {
+                    b.classList.remove("active", "bg-white/5", "text-white");
+                    b.classList.add("bg-transparent", "text-white/60");
+                }
+            });
+
+            // Filter gallery items
+            galleryItems.forEach((item) => {
+                const category = item.getAttribute("data-category");
+
+                if (filterValue === "all" || category === filterValue) {
+                    // Show item
+                    item.style.display = "";
+                    // Small delay to trigger smooth transition
+                    setTimeout(() => {
+                        item.style.opacity = "1";
+                        item.style.transform = "scale(1)";
+                        item.style.pointerEvents = "auto";
+                    }, 50);
+                } else {
+                    // Animate out
+                    item.style.opacity = "0";
+                    item.style.transform = "scale(0.92)";
+                    item.style.pointerEvents = "none";
+
+                    // Hide completely after transition finishes
+                    setTimeout(() => {
+                        if (item.style.opacity === "0") {
+                            item.style.display = "none";
+                        }
+                    }, 400);
+                }
+            });
+        });
     });
 }
