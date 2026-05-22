@@ -184,7 +184,7 @@ class EnvioController extends Controller
                 'required',
                 'string',
                 'max:40',
-                'regex:/^[A-Za-z0-9]+$/',
+                'regex:/^[A-Za-z0-9-]+$/',
                 Rule::unique('envios', 'guia')->ignore($envio?->id),
             ],
             'pago' => ['nullable', Rule::in(self::PAGOS)],
@@ -194,7 +194,7 @@ class EnvioController extends Controller
 
         $validated = $request->validate($rules, [
             'guia.required' => 'La guia de remitente es obligatoria.',
-            'guia.regex' => 'La guia de remitente solo acepta letras y numeros.',
+            'guia.regex' => 'La guia de remitente solo acepta letras, numeros y guiones.',
             'guia.unique' => 'La guia ingresada ya existe.',
             'pago.in' => 'El estado de pago no es valido.',
         ]);

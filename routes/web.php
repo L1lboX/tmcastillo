@@ -6,11 +6,20 @@ use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\TipoPaqueteController;
 use App\Http\Controllers\Api\TransportistaController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\ContactController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
+    return view('public.index');
+})->name('home');
+
+Route::post('/contacto', ContactController::class)
+    ->middleware('throttle:6,1')
+    ->name('contacto.store');
+
+Route::get('/login', function () {
     if (Auth::check()) {
         return redirect()->route('sistema');
     }

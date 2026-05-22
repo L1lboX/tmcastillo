@@ -253,7 +253,7 @@ function bindEvents() {
     on("#amount-form", "submit", saveAmount);
     on("#role-search-input", "input", debounce((event) => loadRoles(event.target.value.trim()), 250));
     on("#f-guia", "input", (event) => {
-        event.target.value = event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+        event.target.value = event.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, "");
     });
 
     document.addEventListener("click", (event) => {
@@ -688,14 +688,22 @@ function fillTransportista(transportista) {
 
 function renderTipoDropdown(search = "") {
     const dropdown = $("#tipo-dropdown");
-    const options = tipos.filter((tipo) => tipo.toLowerCase().includes(search.toLowerCase()));
+    const query = search.toLowerCase();
+    const options = state.packageTypes
+        .filter((tipo) => tipo.activo !== false)
+        .filter((tipo) => tipo.nombre.toLowerCase().includes(query));
 
     if (!options.length) {
         dropdown.classList.remove("open");
         return;
     }
 
-    dropdown.innerHTML = options.map((tipo) => `<button type="button" data-tipo="${tipo}">${tipo}</button>`).join("");
+    dropdown.innerHTML = options.map((tipo) => `
+        <button type="button" data-tipo="${escapeHtml(tipo.nombre)}">
+            <span>${escapeHtml(tipo.nombre)}</span>
+            <small>${money(tipo.precio_transportista)}</small>
+        </button>
+    `).join("");
     dropdown.classList.add("open");
     dropdown.querySelectorAll("button").forEach((button) => {
         button.addEventListener("click", () => {
@@ -751,7 +759,7 @@ function editEnvio(id) {
     $("#f-tipo").value = envio.tipo;
     $("#f-detalle").value = envio.detalle;
     if ($("#f-guia")) $("#f-guia").value = envio.guia || "";
-    $("#f-pago").value = envio.pago;
+    if ($("#f-pago")) $("#f-pago").value = envio.pago;
     if ($("#f-monto")) $("#f-monto").value = envio.monto || "";
     $("#f-obs").value = envio.observacion || "";
     setSpec("tamano", envio.especificacion_tamano);
@@ -857,6 +865,9 @@ function updateDetalle() {
 }
 
 function envioPayload() {
+    const tipo = $("#f-tipo").value.trim();
+    const packageType = state.packageTypes.find((item) => item.nombre.toLowerCase() === tipo.toLowerCase());
+
     return {
         codigo: $("#f-codigo").value,
         fecha: $("#f-fecha").value,
@@ -866,12 +877,13 @@ function envioPayload() {
         direccion: $("#f-direccion").value.trim(),
         transportista_id: $("#f-transportista-id").value || null,
         cantidad: $("#f-cantidad").value.trim(),
-        tipo: $("#f-tipo").value.trim(),
+        tipo,
+        tipo_paquete_id: packageType?.id || null,
         especificacion_tamano: state.spec.tamano,
         especificacion_peso: state.spec.peso,
         detalle: $("#f-detalle").value.trim(),
         guia: $("#f-guia") ? $("#f-guia").value.trim() : null,
-        pago: $("#f-pago").value,
+        pago: $("#f-pago") ? $("#f-pago").value : null,
         monto: $("#f-monto") ? $("#f-monto").value : null,
         observacion: $("#f-obs").value.trim(),
     };
@@ -894,7 +906,6 @@ function validate(payload) {
         "#f-cantidad": payload.cantidad,
         "#f-tipo": payload.tipo,
         "#f-detalle": payload.detalle,
-        "#f-pago": payload.pago,
     };
 
     if ($("#f-guia")) {
@@ -980,6 +991,200 @@ function renderCarriersTable(items) {
             <td><span class="badge pagado">${transportista.activo ? "Activo" : "Inactivo"}</span></td>
         </tr>
     `).join("");
+}
+
+async function loadPackageTypes(activeOnly = false) {
+    try {
+        const params = new URLSearchParams();
+        if (activeOnly) params.set("active_only", "1");
+        const response = await api.get(`/tipos-paquete?${params.toString()}`);
+        state.packageTypes = response.data;
+        renderPackageTypesTable();
+        return response.data;
+    } catch (error) {
+        showToast(error.message, "error");
+        return [];
+    }
+}
+
+function renderPackageTypesTable() {
+    const list = $("#package-types-list");
+    if (!list) return;
+
+    if (!state.packageTypes.length) {
+        list.innerHTML = `<tr><td class="empty-state" colspan="5">Sin tipos de paquete registrados.</td></tr>`;
+        return;
+    }
+
+    list.innerHTML = state.packageTypes.map((tipo) => `
+        <tr>
+            <td>
+                <strong>${escapeHtml(tipo.nombre)}</strong>
+                <span class="cell-sub">${tipo.activo ? "Disponible" : "Inactivo"}</span>
+            </td>
+            <td class="cell-code">${money(tipo.precio_transportista)}</td>
+            <td class="cell-muted">${escapeHtml(tipo.descripcion || "-")}</td>
+            <td><span class="badge ${tipo.activo ? "pagado" : "contra"}">${tipo.activo ? "Activo" : "Inactivo"}</span></td>
+            <td>
+                <div class="row-actions">
+                    <button class="button icon-only icon-edit" type="button" data-package-edit="${tipo.id}" title="Editar" aria-label="Editar tipo"></button>
+                    <button class="button button-danger icon-only icon-delete" type="button" data-package-delete="${tipo.id}" title="Eliminar" aria-label="Eliminar tipo"></button>
+                </div>
+            </td>
+        </tr>
+    `).join("");
+
+    list.querySelectorAll("[data-package-edit]").forEach((button) => {
+        button.addEventListener("click", () => editPackageType(Number(button.dataset.packageEdit)));
+    });
+    list.querySelectorAll("[data-package-delete]").forEach((button) => {
+        button.addEventListener("click", () => deletePackageType(Number(button.dataset.packageDelete)));
+    });
+}
+
+function openPackageTypeModal() {
+    $("#package-type-form").reset();
+    $("#package-type-id").value = "";
+    $("#package-type-active").checked = true;
+    state.editingPackageTypeId = null;
+    $("#package-type-modal-title").textContent = "Registrar tipo";
+    $("#package-type-modal").classList.add("open");
+    $("#package-type-modal").setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+}
+
+function editPackageType(id) {
+    const tipo = state.packageTypes.find((item) => item.id === id);
+    if (!tipo) return;
+
+    openPackageTypeModal();
+    state.editingPackageTypeId = id;
+    $("#package-type-modal-title").textContent = "Editar tipo";
+    $("#package-type-id").value = tipo.id;
+    $("#package-type-name").value = tipo.nombre;
+    $("#package-type-price").value = tipo.precio_transportista;
+    $("#package-type-description").value = tipo.descripcion || "";
+    $("#package-type-active").checked = Boolean(tipo.activo);
+}
+
+async function savePackageType(event) {
+    event.preventDefault();
+
+    const payload = {
+        nombre: $("#package-type-name").value.trim(),
+        precio_transportista: $("#package-type-price").value,
+        descripcion: $("#package-type-description").value.trim(),
+        activo: $("#package-type-active").checked,
+    };
+
+    try {
+        if (state.editingPackageTypeId) {
+            await api.put(`/tipos-paquete/${state.editingPackageTypeId}`, payload);
+            showToast("Tipo actualizado correctamente.");
+        } else {
+            await api.post("/tipos-paquete", payload);
+            showToast("Tipo registrado correctamente.");
+        }
+        closePackageTypeModal();
+        loadPackageTypes(false);
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+async function deletePackageType(id) {
+    if (!confirm("Eliminar este tipo de paquete?")) return;
+
+    try {
+        await api.delete(`/tipos-paquete/${id}`);
+        showToast("Tipo eliminado.");
+        loadPackageTypes(false);
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+async function loadPendingAmounts() {
+    if (!$("#pending-amounts-list")) return;
+
+    try {
+        const response = await api.get("/envios?pago=Pendiente");
+        state.pendingAmounts = response.data;
+        renderPendingAmounts();
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+function renderPendingAmounts() {
+    const list = $("#pending-amounts-list");
+    if (!list) return;
+
+    if (!state.pendingAmounts.length) {
+        list.innerHTML = `<tr><td class="empty-state" colspan="8">No hay envios pendientes de monto.</td></tr>`;
+        return;
+    }
+
+    list.innerHTML = state.pendingAmounts.map((envio) => {
+        const costo = Number(envio.cantidad || 0) * Number(envio.precio_transportista || 0);
+        return `
+            <tr>
+                <td class="cell-code">${escapeHtml(envio.codigo)}</td>
+                <td class="cell-muted">${formatDate(envio.fecha)}</td>
+                <td><strong>${escapeHtml(envio.cliente)}</strong></td>
+                <td class="cell-muted">${escapeHtml(envio.transportista || "-")}</td>
+                <td>${envio.cantidad}</td>
+                <td>${escapeHtml(envio.tipo)}</td>
+                <td class="cell-code">${money(costo)}</td>
+                <td>
+                    <button class="button button-primary button-with-icon icon-money" type="button" data-pending-amount="${envio.id}">Liquidar</button>
+                </td>
+            </tr>
+        `;
+    }).join("");
+
+    list.querySelectorAll("[data-pending-amount]").forEach((button) => {
+        button.addEventListener("click", () => openAmountModal(Number(button.dataset.pendingAmount)));
+    });
+}
+
+function openAmountModal(id) {
+    const envio = state.envios.find((item) => item.id === id)
+        || state.pendingAmounts.find((item) => item.id === id);
+    if (!envio) return;
+
+    state.liquidatingEnvioId = id;
+    $("#amount-form").reset();
+    $("#amount-envio-id").value = id;
+    $("#amount-payment").value = envio.pago && envio.pago !== "Pendiente" ? envio.pago : "Pagado";
+    $("#amount-total").value = envio.monto || "";
+    $("#amount-summary").innerHTML = `
+        <strong>${escapeHtml(envio.codigo)} - ${escapeHtml(envio.cliente || "Cliente")}</strong>
+        <span>${envio.cantidad} x ${escapeHtml(envio.tipo)} · costo estimado ${money(Number(envio.cantidad || 0) * Number(envio.precio_transportista || 0))}</span>
+    `;
+    $("#amount-modal").classList.add("open");
+    $("#amount-modal").setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+}
+
+async function saveAmount(event) {
+    event.preventDefault();
+
+    const id = state.liquidatingEnvioId || Number($("#amount-envio-id").value);
+    const payload = {
+        monto: $("#amount-total").value,
+        pago: $("#amount-payment").value,
+    };
+
+    try {
+        await api.put(`/envios/${id}/liquidacion`, payload);
+        closeAmountModal();
+        showToast("Monto registrado correctamente.");
+        loadEnvios();
+        if ($("#pending-amounts-list")) loadPendingAmounts();
+    } catch (error) {
+        showToast(error.message, "error");
+    }
 }
 
 async function loadRoles(search = "") {

@@ -1093,6 +1093,25 @@ tbody tr:hover {
     text-transform: uppercase;
 }
 
+.amount-summary {
+    display: grid;
+    gap: 4px;
+    margin-bottom: 14px;
+    padding: 12px;
+    background: #fafbfc;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+}
+
+.amount-summary strong {
+    color: var(--text);
+}
+
+.amount-summary span {
+    color: var(--muted);
+    font-size: 12px;
+}
+
 .modal-actions {
     display: flex;
     justify-content: flex-end;

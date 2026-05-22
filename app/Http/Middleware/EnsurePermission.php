@@ -10,9 +10,7 @@ class EnsurePermission
 {
     public function handle(Request $request, Closure $next, string $permission): Response
     {
-        if (! $request->user()?->can($permission)) {
-            abort($request->expectsJson() ? 403 : 404);
-        }
+        abort_unless($request->user()?->can($permission), 403);
 
         return $next($request);
     }
