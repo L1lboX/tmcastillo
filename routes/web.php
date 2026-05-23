@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\ClienteController;
+use App\Http\Controllers\Api\CuentaCorrienteController;
 use App\Http\Controllers\Api\EnvioController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\TipoPaqueteController;
@@ -113,5 +114,13 @@ Route::middleware('auth')->prefix('api')->group(function (): void {
         Route::post('/roles', [RoleController::class, 'store']);
         Route::put('/roles/{role}', [RoleController::class, 'update']);
         Route::delete('/roles/{role}', [RoleController::class, 'destroy']);
+    });
+
+    Route::middleware('permission:clientes.debt')->group(function (): void {
+        Route::get('/cuentas-corrientes', [CuentaCorrienteController::class, 'index']);
+        Route::get('/cuentas-corrientes/clientes-con-deuda', [CuentaCorrienteController::class, 'clientesConDeuda']);
+        Route::get('/cuentas-corrientes/saldo/{dni}', [CuentaCorrienteController::class, 'saldoCliente']);
+        Route::post('/cuentas-corrientes/abono', [CuentaCorrienteController::class, 'registrarAbono']);
+        Route::post('/cuentas-corrientes/sync-envio/{envio}', [CuentaCorrienteController::class, 'syncEnvioCredito']);
     });
 });

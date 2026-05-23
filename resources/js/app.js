@@ -6,12 +6,16 @@ const state = {
     permissions: [],
     packageTypes: [],
     pendingAmounts: [],
+    debtClients: [],
+    debtMovements: [],
+    selectedDebtClient: null,
     nextCode: "ENV-0001",
     editingId: null,
     editingUserId: null,
     editingRoleId: null,
     editingPackageTypeId: null,
     liquidatingEnvioId: null,
+    pagination: { page: 1, lastPage: 1, total: 0 },
     filters: {
         q: "",
         pago: "",
@@ -135,6 +139,9 @@ function bindEvents() {
     document.querySelectorAll("[data-section]").forEach((button) => {
         button.addEventListener("click", () => showSection(button.dataset.section));
     });
+    on("#sidebar-toggle", "click", toggleSidebarMenu);
+    on("#topbar-toggle", "click", toggleSidebarMenu);
+    on("#sidebar-backdrop", "click", closeSidebarMenu);
 
     const debouncedClientSearch = debounce(searchClient, 220);
     const debouncedTransportistaSearch = debounce(searchTransportista, 220);
@@ -207,8 +214,13 @@ function bindEvents() {
     on("#btn-cancel-package-type-modal", "click", closePackageTypeModal);
     on("#btn-close-amount-modal", "click", closeAmountModal);
     on("#btn-cancel-amount-modal", "click", closeAmountModal);
+    on("#btn-open-abono-modal", "click", openAbonoModal);
+    on("#btn-close-abono-modal", "click", closeAbonoModal);
+    on("#btn-cancel-abono-modal", "click", closeAbonoModal);
+    on("#abono-form", "submit", saveAbono);
     on("#btn-export", "click", exportEnvios);
     on("#btn-clear-filters", "click", clearFilters);
+    on("#btn-toggle-filters", "click", toggleFilterPanel);
     $("#envio-modal")?.addEventListener("click", (event) => {
         if (event.target.id === "envio-modal") closeModal();
     });
@@ -230,6 +242,9 @@ function bindEvents() {
     $("#amount-modal")?.addEventListener("click", (event) => {
         if (event.target.id === "amount-modal") closeAmountModal();
     });
+    $("#abono-modal")?.addEventListener("click", (event) => {
+        if (event.target.id === "abono-modal") closeAbonoModal();
+    });
     $("#details-modal")?.addEventListener("click", (event) => {
         if (event.target.id === "details-modal") closeDetailsModal();
     });
@@ -241,6 +256,8 @@ function bindEvents() {
     $("#filter-cliente").addEventListener("input", debounce((event) => setFilter("cliente", event.target.value.trim()), 250));
     $("#filter-transportista").addEventListener("input", debounce((event) => setFilter("transportista", event.target.value.trim()), 250));
     $("#filter-tipo").addEventListener("input", debounce((event) => setFilter("tipo", event.target.value.trim()), 250));
+
+    $("#debt-client-search")?.addEventListener("input", debounce((event) => filterDebtClients(event.target.value.trim()), 250));
 
     $("#envio-form").addEventListener("submit", saveEnvio);
     on("#btn-save-client", "click", saveClient);
@@ -265,14 +282,15 @@ function bindEvents() {
 
 function showSection(section) {
     const titles = {
-        envios: ["Envios", "Registro y control de paquetes"],
+        envios: ["Envíos", "Registro y control de carga"],
         clientes: ["Clientes", "Registro y consulta de clientes"],
         transportistas: ["Transportistas", "Responsables de traslado"],
-        dashboard: ["Dashboard", "Indicadores y control del negocio"],
+        dashboard: ["Dashboard", "Indicadores y control operativo"],
         roles: ["Roles", "Permisos por tipo de usuario"],
         usuarios: ["Usuarios", "Cuentas de acceso al sistema"],
         tipos: ["Tipos de paquete", "Precios por unidad"],
         montos: ["Montos", "Envios pendientes de liquidacion"],
+        cuentas: ["Cuentas por cobrar", "Control de deudas y abonos"],
     };
 
     document.querySelectorAll("[data-page]").forEach((page) => {
@@ -285,6 +303,8 @@ function showSection(section) {
     const [title, subtitle] = titles[section] || titles.envios;
     $("#section-title").textContent = title;
     $("#section-subtitle").textContent = subtitle;
+    closeSidebarMenu();
+    closeFilterPanel();
 
     if (section === "clientes" || section === "transportistas") {
         loadManagementLists();
@@ -298,24 +318,67 @@ function showSection(section) {
     if (section === "montos") {
         loadPendingAmounts();
     }
+    if (section === "cuentas") {
+        loadDebtClients();
+    }
     if (section === "usuarios") {
         loadUsers();
     }
 }
 
+function toggleSidebarMenu() {
+    const sidebar = $(".sidebar");
+    const backdrop = $("#sidebar-backdrop");
+    const toggles = document.querySelectorAll(".sidebar-toggle");
+    const isOpen = sidebar?.classList.toggle("open") ?? false;
+
+    backdrop?.classList.toggle("open", isOpen);
+    toggles.forEach((btn) => btn.setAttribute("aria-expanded", String(isOpen)));
+}
+
+function closeSidebarMenu() {
+    const sidebar = $(".sidebar");
+    const backdrop = $("#sidebar-backdrop");
+    const toggles = document.querySelectorAll(".sidebar-toggle");
+
+    sidebar?.classList.remove("open");
+    backdrop?.classList.remove("open");
+    toggles.forEach((btn) => btn.setAttribute("aria-expanded", "false"));
+}
+
+function toggleFilterPanel() {
+    const panel = $("#filter-panel");
+    const btn = $("#btn-toggle-filters");
+    const isOpen = panel?.classList.toggle("open") ?? false;
+    btn?.setAttribute("aria-expanded", String(isOpen));
+}
+
+function closeFilterPanel() {
+    const panel = $("#filter-panel");
+    const btn = $("#btn-toggle-filters");
+    panel?.classList.remove("open");
+    btn?.setAttribute("aria-expanded", "false");
+}
+
 function setFilter(key, value) {
     state.filters[key] = value;
+    state.pagination.page = 1;
     loadEnvios();
 }
 
 async function loadEnvios() {
     const params = filterParams();
+    params.set("page", state.pagination.page);
+    params.set("per_page", 15);
 
     try {
         const response = await api.get(`/envios?${params.toString()}`);
         state.envios = response.data;
         state.nextCode = response.next_code;
+        state.pagination.lastPage = response.meta.last_page;
+        state.pagination.total = response.meta.total;
         renderTable();
+        renderPagination();
         loadStats();
     } catch (error) {
         showToast(error.message, "error");
@@ -330,9 +393,15 @@ async function loadStats() {
         $("#stat-hoy").textContent = response.data.hoy;
         $("#stat-ce").textContent = response.data.contra_entrega;
         if ($("#stat-pendientes")) $("#stat-pendientes").textContent = response.data.pendientes_monto;
-        $("#count-display").textContent = `${state.envios.length} registros`;
     } catch {
-        $("#count-display").textContent = `${state.envios.length} registros`;
+        // stats fail silently
+    }
+
+    const { page, lastPage, total } = state.pagination;
+    if (lastPage > 1) {
+        $("#count-display").textContent = `Pág. ${page} de ${lastPage} · ${total} registros`;
+    } else {
+        $("#count-display").textContent = `${total || state.envios.length} registros`;
     }
 }
 
@@ -340,7 +409,7 @@ function renderTable() {
     const tbody = $("#envios-tbody");
 
     if (!state.envios.length) {
-        tbody.innerHTML = `<tr><td class="empty-state" colspan="${can("envios.amounts") ? 12 : 10}">No hay envios registrados.</td></tr>`;
+        tbody.innerHTML = `<tr><td class="empty-state" colspan="${can("envios.amounts") ? 11 : 10}">No hay envios registrados.</td></tr>`;
         return;
     }
 
@@ -353,16 +422,15 @@ function renderTable() {
                 <td>
                     <strong>${escapeHtml(envio.cliente)}</strong>
                 </td>
-                <td>
+                <td class="col-hide-mob">
                     <strong>${escapeHtml(envio.transportista || "-")}</strong>
                 </td>
-                <td>${envio.cantidad}</td>
-                <td class="cell-muted">${escapeHtml(envio.tipo)}</td>
-                <td>${specBadges(envio)}</td>
-                <td class="cell-code">${escapeHtml(envio.guia || "-")}</td>
-                <td><span class="badge ${badgeClass}">${escapeHtml(envio.pago)}</span></td>
-                ${can("envios.amounts") ? `<td class="cell-code">${money(envio.monto)}</td>` : ""}
-                ${can("envios.amounts") ? `<td class="cell-code">${money(envio.margen)}</td>` : ""}
+                <td class="col-hide-mob">${envio.cantidad}</td>
+                <td class="col-hide-mob cell-muted">${escapeHtml(envio.tipo)}</td>
+                <td class="col-hide-mob">${specBadges(envio)}</td>
+                <td class="col-hide-mob cell-code">${escapeHtml(envio.guia || "-")}</td>
+                <td class="col-hide-mob"><span class="badge ${badgeClass}">${escapeHtml(envio.pago)}</span></td>
+                ${can("envios.amounts") ? `<td class="col-hide-mob cell-code">${money(envio.monto)}</td>` : ""}
                 <td>
                     <div class="row-actions">
                         <button class="button icon-only icon-details" type="button" data-details="${envio.id}" title="Ver detalles" aria-label="Ver detalles"></button>
@@ -388,6 +456,56 @@ function renderTable() {
     tbody.querySelectorAll("[data-delete]").forEach((button) => {
         button.addEventListener("click", () => deleteEnvio(Number(button.dataset.delete)));
     });
+}
+
+function renderPagination() {
+    const container = $("#pagination-controls");
+    if (!container) return;
+
+    const { page, lastPage, total } = state.pagination;
+    if (lastPage <= 1) {
+        container.innerHTML = "";
+        return;
+    }
+
+    let html = '<div class="pagination">';
+
+    html += `<button class="pagination-btn" data-page="1" ${page === 1 ? "disabled" : ""}>&laquo;</button>`;
+    html += `<button class="pagination-btn" data-page="${page - 1}" ${page <= 1 ? "disabled" : ""}>&lsaquo;</button>`;
+
+    const start = Math.max(1, page - 2);
+    const end = Math.min(lastPage, page + 2);
+
+    if (start > 1) {
+        html += `<button class="pagination-btn" data-page="1">1</button>`;
+        if (start > 2) html += `<span class="pagination-ellipsis">&hellip;</span>`;
+    }
+
+    for (let i = start; i <= end; i++) {
+        html += `<button class="pagination-btn${i === page ? " active" : ""}" data-page="${i}">${i}</button>`;
+    }
+
+    if (end < lastPage) {
+        if (end < lastPage - 1) html += `<span class="pagination-ellipsis">&hellip;</span>`;
+        html += `<button class="pagination-btn" data-page="${lastPage}">${lastPage}</button>`;
+    }
+
+    html += `<button class="pagination-btn" data-page="${page + 1}" ${page >= lastPage ? "disabled" : ""}>&rsaquo;</button>`;
+    html += `<button class="pagination-btn" data-page="${lastPage}" ${page === lastPage ? "disabled" : ""}>&raquo;</button>`;
+    html += "</div>";
+
+    container.innerHTML = html;
+
+    container.querySelectorAll(".pagination-btn:not([disabled])").forEach((btn) => {
+        btn.addEventListener("click", () => goToPage(Number(btn.dataset.page)));
+    });
+}
+
+function goToPage(page) {
+    if (page < 1 || page > state.pagination.lastPage) return;
+    state.pagination.page = page;
+    loadEnvios();
+    $("#envios-tbody").scrollIntoView({ block: "start", behavior: "smooth" });
 }
 
 function openModal() {
@@ -457,6 +575,199 @@ function closeAmountModal() {
     $("#amount-modal").setAttribute("aria-hidden", "true");
     document.body.style.overflow = "";
     state.liquidatingEnvioId = null;
+}
+
+function openAbonoModal() {
+    $("#abono-form").reset();
+    $("#abono-cliente-dni").value = "";
+    $("#abono-cliente-nombre").value = "";
+    $("#abono-fecha").value = new Date().toISOString().slice(0, 10);
+    $("#abono-summary").innerHTML = '<small>Selecciona un cliente de la lista para registrar un abono.</small>';
+    $("#abono-modal").classList.add("open");
+    $("#abono-modal").setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+}
+
+function openAbonoModalForClient(dni, nombre, saldo) {
+    state.selectedDebtClient = { dni, nombre, saldo };
+    $("#abono-cliente-dni").value = dni;
+    $("#abono-cliente-nombre").value = `${nombre} (DNI: ${dni})`;
+    $("#abono-summary").innerHTML = `
+        <strong>${escapeHtml(nombre)}</strong>
+        <span>Saldo pendiente: ${money(saldo)}</span>
+    `;
+    $("#abono-modal").classList.add("open");
+    $("#abono-modal").setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+}
+
+function closeAbonoModal() {
+    $("#abono-modal").classList.remove("open");
+    $("#abono-modal").setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+    state.selectedDebtClient = null;
+}
+
+async function saveAbono(event) {
+    event.preventDefault();
+
+    const payload = {
+        cliente_dni: $("#abono-cliente-dni").value,
+        monto: $("#abono-monto").value,
+        fecha: $("#abono-fecha").value,
+        observacion: $("#abono-observacion").value.trim() || null,
+    };
+
+    try {
+        await api.post("/cuentas-corrientes/abono", payload);
+        closeAbonoModal();
+        showToast("Abono registrado correctamente.");
+        loadDebtClients();
+        if (state.selectedDebtClient) {
+            loadDebtMovements(state.selectedDebtClient.dni);
+        }
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+async function loadDebtClients() {
+    if (!$("#debt-clients-list")) return;
+
+    try {
+        const response = await api.get("/cuentas-corrientes/clientes-con-deuda");
+        state.debtClients = response.data;
+        renderDebtClients();
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+function renderDebtClients() {
+    const list = $("#debt-clients-list");
+    if (!list) return;
+
+    const totalDeuda = state.debtClients.reduce((sum, c) => sum + Number(c.saldo_pendiente || 0), 0);
+    $("#debt-client-count").textContent = state.debtClients.length;
+    $("#debt-total-amount").textContent = money(totalDeuda);
+
+    if (!state.debtClients.length) {
+        list.innerHTML = `<tr><td class="empty-state" colspan="5">No hay clientes con deuda pendiente.</td></tr>`;
+        $("#debt-movements-list").innerHTML = `<tr><td class="empty-state" colspan="6">Selecciona un cliente para ver sus movimientos.</td></tr>`;
+        return;
+    }
+
+    list.innerHTML = state.debtClients.map((cliente) => `
+        <tr>
+            <td class="cell-code">${escapeHtml(cliente.dni)}</td>
+            <td><strong>${escapeHtml(cliente.nombre)}</strong></td>
+            <td class="cell-muted">${escapeHtml(cliente.telefono || "-")}</td>
+            <td class="cell-code" style="color: #f59e0b;">${money(cliente.saldo_pendiente)}</td>
+            <td>
+                <div class="row-actions">
+                    <button class="button button-primary button-with-icon icon-money" type="button" data-abono="${escapeHtml(cliente.dni)}" data-nombre="${escapeHtml(cliente.nombre)}" data-saldo="${cliente.saldo_pendiente}">Abonar</button>
+                    <button class="button button-with-icon icon-details" type="button" data-movements="${escapeHtml(cliente.dni)}" title="Ver movimientos">Movimientos</button>
+                </div>
+            </td>
+        </tr>
+    `).join("");
+
+    list.querySelectorAll("[data-abono]").forEach((button) => {
+        button.addEventListener("click", () => {
+            openAbonoModalForClient(button.dataset.dni, button.dataset.nombre, Number(button.dataset.saldo));
+        });
+    });
+
+    list.querySelectorAll("[data-movements]").forEach((button) => {
+        button.addEventListener("click", () => loadDebtMovements(button.dataset.movements));
+    });
+}
+
+function filterDebtClients(search) {
+    const list = $("#debt-clients-list");
+    if (!list || !search) {
+        renderDebtClients();
+        return;
+    }
+
+    const filtered = state.debtClients.filter((c) =>
+        c.nombre.toLowerCase().includes(search.toLowerCase()) ||
+        c.dni.includes(search)
+    );
+
+    const totalDeuda = filtered.reduce((sum, c) => sum + Number(c.saldo_pendiente || 0), 0);
+    $("#debt-client-count").textContent = filtered.length;
+    $("#debt-total-amount").textContent = money(totalDeuda);
+
+    if (!filtered.length) {
+        list.innerHTML = `<tr><td class="empty-state" colspan="5">No se encontraron clientes.</td></tr>`;
+        return;
+    }
+
+    list.innerHTML = filtered.map((cliente) => `
+        <tr>
+            <td class="cell-code">${escapeHtml(cliente.dni)}</td>
+            <td><strong>${escapeHtml(cliente.nombre)}</strong></td>
+            <td class="cell-muted">${escapeHtml(cliente.telefono || "-")}</td>
+            <td class="cell-code" style="color: #f59e0b;">${money(cliente.saldo_pendiente)}</td>
+            <td>
+                <div class="row-actions">
+                    <button class="button button-primary button-with-icon icon-money" type="button" data-abono="${escapeHtml(cliente.dni)}" data-nombre="${escapeHtml(cliente.nombre)}" data-saldo="${cliente.saldo_pendiente}">Abonar</button>
+                    <button class="button button-with-icon icon-details" type="button" data-movements="${escapeHtml(cliente.dni)}" title="Ver movimientos">Movimientos</button>
+                </div>
+            </td>
+        </tr>
+    `).join("");
+
+    list.querySelectorAll("[data-abono]").forEach((button) => {
+        button.addEventListener("click", () => {
+            openAbonoModalForClient(button.dataset.dni, button.dataset.nombre, Number(button.dataset.saldo));
+        });
+    });
+
+    list.querySelectorAll("[data-movements]").forEach((button) => {
+        button.addEventListener("click", () => loadDebtMovements(button.dataset.movements));
+    });
+}
+
+async function loadDebtMovements(dni) {
+    if (!$("#debt-movements-list")) return;
+
+    try {
+        const response = await api.get(`/cuentas-corrientes?cliente_dni=${dni}`);
+        state.debtMovements = response.data;
+        renderDebtMovements(dni);
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+function renderDebtMovements(dni) {
+    const list = $("#debt-movements-list");
+    if (!list) return;
+
+    const cliente = state.debtClients.find((c) => c.dni === dni);
+    $("#debt-movements-title").textContent = cliente ? `Movimientos de ${cliente.nombre}` : "Movimientos del cliente";
+
+    if (!state.debtMovements.length) {
+        list.innerHTML = `<tr><td class="empty-state" colspan="6">No hay movimientos registrados.</td></tr>`;
+        return;
+    }
+
+    list.innerHTML = state.debtMovements.map((mov) => {
+        const tipoClass = mov.tipo === "cargo" ? "contra" : "pagado";
+        const tipoLabel = mov.tipo === "cargo" ? "Cargo" : "Abono";
+        return `
+            <tr>
+                <td class="cell-muted">${formatDate(mov.fecha)}</td>
+                <td><span class="badge ${tipoClass}">${tipoLabel}</span></td>
+                <td class="cell-code">${escapeHtml(mov.envio_codigo || "-")}</td>
+                <td class="cell-code">${money(mov.monto)}</td>
+                <td class="cell-code">${money(mov.saldo_acumulado)}</td>
+                <td class="cell-muted">${escapeHtml(mov.observacion || "-")}</td>
+            </tr>
+        `;
+    }).join("");
 }
 
 function resetForm() {
@@ -932,6 +1243,7 @@ function clearFilters() {
         transportista: "",
         tipo: "",
     };
+    state.pagination.page = 1;
     $("#search-input").value = "";
     $("#filter-pago").value = "";
     $("#filter-fecha-desde").value = "";
@@ -1108,7 +1420,7 @@ async function loadPendingAmounts() {
     if (!$("#pending-amounts-list")) return;
 
     try {
-        const response = await api.get("/envios?pago=Pendiente");
+        const response = await api.get("/envios?pago=Pendiente&per_page=1000");
         state.pendingAmounts = response.data;
         renderPendingAmounts();
     } catch (error) {

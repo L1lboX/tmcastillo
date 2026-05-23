@@ -29,6 +29,7 @@ class DatabaseSeeder extends Seeder
             'envios.export' => 'Exportar envios',
             'envios.amounts' => 'Registrar montos',
             'clientes.manage' => 'Gestionar clientes',
+            'clientes.debt' => 'Ver cuentas por cobrar',
             'transportistas.manage' => 'Gestionar transportistas',
             'tipos_paquete.manage' => 'Gestionar tipos de paquete',
             'dashboard.view' => 'Ver dashboard',
@@ -48,7 +49,7 @@ class DatabaseSeeder extends Seeder
             ],
             'contador' => [
                 'label' => 'Contador',
-                'permissions' => ['envios.view', 'envios.export', 'envios.amounts', 'dashboard.view'],
+                'permissions' => ['envios.view', 'envios.export', 'envios.amounts', 'clientes.debt', 'dashboard.view'],
             ],
             'transportista' => [
                 'label' => 'Transportista',
@@ -56,7 +57,7 @@ class DatabaseSeeder extends Seeder
             ],
             'administrador' => [
                 'label' => 'Administrador',
-                'permissions' => ['envios.view', 'envios.create', 'envios.update', 'envios.delete', 'envios.export', 'envios.amounts', 'clientes.manage', 'transportistas.manage', 'tipos_paquete.manage', 'dashboard.view', 'users.manage', 'roles.manage'],
+                'permissions' => ['envios.view', 'envios.create', 'envios.update', 'envios.delete', 'envios.export', 'envios.amounts', 'clientes.manage', 'clientes.debt', 'transportistas.manage', 'tipos_paquete.manage', 'dashboard.view', 'users.manage', 'roles.manage'],
             ],
             'super_admin' => [
                 'label' => 'Super admin',

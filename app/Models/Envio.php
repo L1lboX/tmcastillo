@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'codigo',
@@ -52,5 +53,10 @@ class Envio extends Model
     public function tipoPaquete(): BelongsTo
     {
         return $this->belongsTo(TipoPaquete::class);
+    }
+
+    public function cuentaCorriente(): HasOne
+    {
+        return $this->hasOne(CuentaCorriente::class);
     }
 }

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Transportes Castillo - Sistema de Envios</title>
+    <title>Transportes Castillo - Sistema de Envíos</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
@@ -26,13 +26,18 @@
                 <div class="brand-mark" aria-hidden="true">TC</div>
                 <div>
                     <strong>Transportes Castillo</strong>
-                    <span>Gestion operativa</span>
+                    <span>Gestión operativa</span>
                 </div>
+                <button class="sidebar-toggle" id="sidebar-toggle" type="button" aria-expanded="false" aria-controls="sidebar-nav" aria-label="Abrir menú">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
             </div>
 
-            <nav class="sidebar-nav" aria-label="Modulos">
+            <nav class="sidebar-nav" id="sidebar-nav" aria-label="Módulos">
                 @can('envios.view')
-                    <button class="sidebar-link active" type="button" data-section="envios">Envios</button>
+                    <button class="sidebar-link active" type="button" data-section="envios">Envíos</button>
                 @endcan
                 @can('clientes.manage')
                     <button class="sidebar-link" type="button" data-section="clientes">Clientes</button>
@@ -41,10 +46,13 @@
                     <button class="sidebar-link" type="button" data-section="transportistas">Transportistas</button>
                 @endcan
                 @can('tipos_paquete.manage')
-                    <button class="sidebar-link" type="button" data-section="tipos">Tipos paquete</button>
+                    <button class="sidebar-link" type="button" data-section="tipos">Tipos de paquete</button>
                 @endcan
                 @can('envios.amounts')
                     <button class="sidebar-link" type="button" data-section="montos">Montos</button>
+                @endcan
+                @can('clientes.debt')
+                    <button class="sidebar-link" type="button" data-section="cuentas">Cuentas por cobrar</button>
                 @endcan
                 @can('dashboard.view')
                     <button class="sidebar-link" type="button" data-section="dashboard">Dashboard</button>
@@ -56,14 +64,31 @@
                     <button class="sidebar-link" type="button" data-section="usuarios">Usuarios</button>
                 @endcan
             </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-chip-sidebar">
+                    <span>{{ auth()->user()->name }}</span>
+                    <small>{{ auth()->user()->roles->pluck('label')->join(', ') }}</small>
+                </div>
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    <button class="button button-logout" type="submit">Salir</button>
+                </form>
+            </div>
         </aside>
+        <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
 
         <div class="app-main">
             <header class="topbar">
                 <div>
-                    <strong id="section-title">Envios</strong>
-                    <span id="section-subtitle">Registro y control de paquetes</span>
+                    <strong id="section-title">Envíos</strong>
+                    <span id="section-subtitle">Registro y control de carga</span>
                 </div>
+                <button class="sidebar-toggle" id="topbar-toggle" type="button" aria-expanded="false" aria-label="Abrir menú">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
 
                 <div class="topbar-metrics">
                     <div class="metric">
@@ -84,106 +109,102 @@
                             <small>Pend. monto</small>
                         </div>
                     @endcan
-                    <div class="metric user-chip">
-                        <span>{{ auth()->user()->name }}</span>
-                        <small>{{ auth()->user()->roles->pluck('label')->join(', ') }}</small>
-                    </div>
                     <time id="current-date"></time>
-                    <form method="POST" action="{{ route('logout') }}">
-                        @csrf
-                        <button class="button" type="submit">Salir</button>
-                    </form>
                 </div>
             </header>
 
             <main class="workspace">
                 <section class="module-page" data-page="envios">
-                    <section class="page-head">
-                        <div>
-                            <h1>Registro de Envios</h1>
-                            <p>Consulta, registra, filtra y exporta envios.</p>
-                        </div>
+                    <section class="page-head page-head-compact">
                         <div class="head-actions">
                             @can('envios.export')
                                 <button class="button button-with-icon icon-download" id="btn-export" type="button">Exportar Excel</button>
                             @endcan
                             @can('envios.create')
-                                <button class="button button-primary button-with-icon icon-add" id="btn-open-modal" type="button">Nuevo envio</button>
+                                <button class="button button-primary button-with-icon icon-add" id="btn-open-modal" type="button">Nuevo envío</button>
                             @endcan
                         </div>
                     </section>
 
                     <section class="table-shell">
-            <div class="table-tools">
-                <label class="search-field">
-                    <span>Buscar</span>
-                    <input id="search-input" type="search" placeholder="Cliente, DNI, guia o tipo">
-                </label>
+                        <div class="table-tools table-tools-bar">
+                            <div class="search-group">
+                                <label class="search-field">
+                                    <span>Buscar</span>
+                                    <input id="search-input" type="search" placeholder="Cliente, DNI, guía o tipo">
+                                </label>
+                                <button class="button button-with-icon icon-filter" id="btn-toggle-filters" type="button">Filtros</button>
+                            </div>
+                            <strong id="count-display">0 registros</strong>
+                        </div>
 
-                <div class="tool-group">
-                    <label>
-                        <span>Desde</span>
-                        <input id="filter-fecha-desde" type="date">
-                    </label>
-                    <label>
-                        <span>Hasta</span>
-                        <input id="filter-fecha-hasta" type="date">
-                    </label>
-                    <label>
-                        <span>Pago</span>
-                        <select id="filter-pago">
-                            <option value="">Todos</option>
-                            <option value="Pendiente">Pendiente</option>
-                            <option value="Pagado">Pagado</option>
-                            <option value="Contra Entrega">Contra entrega</option>
-                            <option value="Credito">Credito</option>
-                        </select>
-                    </label>
-                </div>
-            </div>
+                        <div class="filter-panel" id="filter-panel">
+                            <div class="table-tools">
+                                <div class="tool-group">
+                                    <label>
+                                        <span>Desde</span>
+                                        <input id="filter-fecha-desde" type="date">
+                                    </label>
+                                    <label>
+                                        <span>Hasta</span>
+                                        <input id="filter-fecha-hasta" type="date">
+                                    </label>
+                                    <label>
+                                        <span>Pago</span>
+                                        <select id="filter-pago">
+                                            <option value="">Todos</option>
+                                            <option value="Pendiente">Pendiente</option>
+                                            <option value="Pagado">Pagado</option>
+                                            <option value="Contra Entrega">Contra entrega</option>
+                                            <option value="Credito">Credito</option>
+                                        </select>
+                                    </label>
+                                </div>
+                            </div>
 
-            <div class="table-tools table-tools-secondary">
-                <div class="tool-group">
-                    <label>
-                        <span>Cliente</span>
-                        <input id="filter-cliente" type="search" placeholder="Nombre o DNI">
-                    </label>
-                    <label>
-                        <span>Transportista</span>
-                        <input id="filter-transportista" type="search" placeholder="Nombre o documento">
-                    </label>
-                    <label>
-                        <span>Tipo</span>
-                        <input id="filter-tipo" type="search" placeholder="Caja, saco...">
-                    </label>
-                    <button class="button button-with-icon icon-clear" id="btn-clear-filters" type="button">Limpiar filtros</button>
-                </div>
-                <strong id="count-display">0 registros</strong>
-            </div>
+                            <div class="table-tools table-tools-secondary">
+                                <div class="tool-group">
+                                    <label>
+                                        <span>Cliente</span>
+                                        <input id="filter-cliente" type="search" placeholder="Nombre o DNI">
+                                    </label>
+                                    <label>
+                                        <span>Transportista</span>
+                                        <input id="filter-transportista" type="search" placeholder="Nombre o documento">
+                                    </label>
+                                    <label>
+                                        <span>Tipo</span>
+                                        <input id="filter-tipo" type="search" placeholder="Caja, saco...">
+                                    </label>
+                                    <button class="button button-with-icon icon-clear" id="btn-clear-filters" type="button">Limpiar filtros</button>
+                                </div>
+                            </div>
+                        </div>
 
-            <div class="table-scroll">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Fecha</th>
-                            <th>Cliente</th>
-                            <th>Transportista</th>
-                            <th>Cant.</th>
-                            <th>Tipo</th>
-                            <th>Especificacion</th>
-                            <th>Guia</th>
-                            <th>Pago</th>
-                            @can('envios.amounts')
-                                <th>Monto</th>
-                                <th>Margen</th>
-                            @endcan
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="envios-tbody"></tbody>
-                </table>
-            </div>
+                        <div class="table-scroll">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Fecha</th>
+                                        <th>Cliente</th>
+                                        <th class="col-hide-mob">Transportista</th>
+                                        <th class="col-hide-mob">Cant.</th>
+                                        <th class="col-hide-mob">Tipo</th>
+                                        <th class="col-hide-mob">Especificacion</th>
+                                        <th class="col-hide-mob">Guia</th>
+                                        <th class="col-hide-mob">Pago</th>
+                                        @can('envios.amounts')
+                                            <th class="col-hide-mob">Monto</th>
+                                        @endcan
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="envios-tbody"></tbody>
+                            </table>
+                        </div>
+
+                        <div id="pagination-controls"></div>
                     </section>
                 </section>
 
@@ -191,7 +212,7 @@
                     <section class="page-head">
                         <div>
                             <h1>Clientes</h1>
-                            <p>Registro independiente de clientes para usar en envios.</p>
+                            <p>Registro independiente de clientes para usar en envíos.</p>
                         </div>
                         @can('clientes.manage')
                             <button class="button button-primary button-with-icon icon-add-user" id="btn-open-client-modal" type="button">Nuevo cliente</button>
@@ -274,7 +295,7 @@
                     <section class="page-head">
                         <div>
                             <h1>Envios pendientes de monto</h1>
-                            <p>Completa el monto cobrado, pago y margen del envio.</p>
+                            <p>Completa el monto cobrado, pago y margen del envío.</p>
                         </div>
                     </section>
 
@@ -299,10 +320,75 @@
                     </section>
                 </section>
 
+                <section class="module-page hidden" data-page="cuentas">
+                    <section class="page-head">
+                        <div>
+                            <h1>Cuentas por cobrar</h1>
+                            <p>Control de deudas y abonos de clientes.</p>
+                        </div>
+                    </section>
+
+                    <section class="stats-row" id="debt-stats" style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                        <div class="metric-card" style="flex: 1; min-width: 200px; background: #1e293b; border-radius: 0.5rem; padding: 1rem;">
+                            <small style="color: #94a3b8;">Total clientes con deuda</small>
+                            <strong id="debt-client-count" style="font-size: 1.5rem; display: block; margin-top: 0.25rem;">0</strong>
+                        </div>
+                        <div class="metric-card" style="flex: 1; min-width: 200px; background: #1e293b; border-radius: 0.5rem; padding: 1rem;">
+                            <small style="color: #94a3b8;">Deuda total pendiente</small>
+                            <strong id="debt-total-amount" style="font-size: 1.5rem; display: block; margin-top: 0.25rem;">S/ 0.00</strong>
+                        </div>
+                    </section>
+
+                    <section class="table-shell">
+                        <div class="table-tools">
+                            <label class="search-field">
+                                <span>Buscar cliente</span>
+                                <input id="debt-client-search" type="search" placeholder="Nombre o DNI">
+                            </label>
+                            <button class="button button-primary button-with-icon icon-add" id="btn-open-abono-modal" type="button">Registrar abono</button>
+                        </div>
+                        <div class="table-scroll">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>DNI</th>
+                                        <th>Cliente</th>
+                                        <th>Telefono</th>
+                                        <th>Saldo pendiente</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="debt-clients-list"></tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <section class="table-shell" style="margin-top: 1.5rem;">
+                        <div class="table-tools">
+                            <strong id="debt-movements-title">Movimientos del cliente</strong>
+                        </div>
+                        <div class="table-scroll">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Tipo</th>
+                                        <th>Envio</th>
+                                        <th>Monto</th>
+                                        <th>Saldo acumulado</th>
+                                        <th>Observacion</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="debt-movements-list"></tbody>
+                            </table>
+                        </div>
+                    </section>
+                </section>
+
                 <section class="module-page hidden" data-page="dashboard">
                     <section class="placeholder-module">
                         <h1>Dashboard</h1>
-                        <p>Modulo reservado para indicadores, ganancias y analisis por rol.</p>
+                        <p>Módulo reservado para indicadores, ganancias y análisis por rol.</p>
                     </section>
                 </section>
 
@@ -310,7 +396,7 @@
                     <section class="page-head">
                         <div>
                             <h1>Roles y permisos</h1>
-                            <p>Define que puede ver, crear, editar, eliminar o registrar montos cada rol.</p>
+                            <p>Define qué puede ver, crear, editar, eliminar o registrar cada rol.</p>
                         </div>
                         @can('roles.manage')
                             <button class="button button-primary button-with-icon icon-add" id="btn-open-role-modal" type="button">Nuevo rol</button>
@@ -378,7 +464,7 @@
     <div class="modal-backdrop" id="details-modal" aria-hidden="true">
         <section class="modal modal-small" role="dialog" aria-modal="true" aria-labelledby="details-title">
             <header class="modal-head">
-                <h2 id="details-title">Detalle del envio</h2>
+                <h2 id="details-title">Detalle del envío</h2>
                 <button class="button button-with-icon icon-close" id="btn-close-details-modal" type="button">Cerrar</button>
             </header>
             <div class="modal-body details-body" id="details-body"></div>
@@ -452,7 +538,7 @@
     <div class="modal-backdrop" id="envio-modal" aria-hidden="true">
         <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
             <header class="modal-head">
-                <h2 id="modal-title">Registrar envio</h2>
+                <h2 id="modal-title">Registrar envío</h2>
                 <button class="button button-with-icon icon-close" id="btn-close-modal" type="button">Cerrar</button>
             </header>
 
@@ -529,7 +615,7 @@
                 </div>
 
                 <div class="form-section">
-                    <h3>04 Datos del envio</h3>
+                    <h3>04 Datos del envío</h3>
                     <div class="form-grid four">
                         <label>
                             <span>Cantidad</span>
@@ -544,9 +630,9 @@
                 </div>
 
                 <div class="form-section spec-layout">
-                    <h3>05 Especificacion</h3>
+                    <h3>05 Especificación</h3>
                     <label>
-                        <span>Tamano</span>
+                        <span>Tamaño</span>
                         <select id="f-tamano">
                             <option value="">Seleccionar</option>
                             <option value="Pequeno">Pequeno</option>
@@ -570,23 +656,23 @@
                 <div class="form-section">
                     <h3>06 Detalle</h3>
                     <label>
-                        <span>Detalle del envio</span>
-                        <textarea id="f-detalle" rows="3" placeholder="Se genera automaticamente y puedes editarlo"></textarea>
+                        <span>Detalle del envío</span>
+                        <textarea id="f-detalle" rows="3" placeholder="Se genera automáticamente y puedes editarlo"></textarea>
                     </label>
                 </div>
 
                 <div class="form-section">
-                    <h3>07 Guia</h3>
+                    <h3>07 Guía</h3>
                     <div class="form-grid two">
                         <label>
-                            <span>Guia de remitente</span>
+                            <span>Guía de remitente</span>
                             <input type="text" id="f-guia" maxlength="40" inputmode="text" autocomplete="off" placeholder="ABC123456">
                         </label>
                     </div>
                 </div>
 
                 <div class="form-section">
-                    <h3>08 Observacion</h3>
+                    <h3>08 Observación</h3>
                     <label>
                         <span>Observaciones</span>
                         <textarea id="f-obs" rows="2" placeholder="Notas internas del envio"></textarea>
@@ -595,7 +681,7 @@
 
                 <footer class="modal-actions">
                     <button class="button button-with-icon icon-cancel" id="btn-cancel" type="button">Cancelar</button>
-                    <button class="button button-primary button-with-icon icon-save" type="submit">Guardar envio</button>
+                    <button class="button button-primary button-with-icon icon-save" type="submit">Guardar envío</button>
                 </footer>
             </form>
         </section>
@@ -747,6 +833,44 @@
                     <footer class="modal-actions">
                         <button class="button button-with-icon icon-cancel" id="btn-cancel-amount-modal" type="button">Cancelar</button>
                         <button class="button button-primary button-with-icon icon-save" type="submit">Guardar monto</button>
+                    </footer>
+                </form>
+            </section>
+        </div>
+    @endcan
+
+    @can('clientes.debt')
+        <div class="modal-backdrop" id="abono-modal" aria-hidden="true">
+            <section class="modal modal-small" role="dialog" aria-modal="true" aria-labelledby="abono-modal-title">
+                <header class="modal-head">
+                    <h2 id="abono-modal-title">Registrar abono</h2>
+                    <button class="button button-with-icon icon-close" id="btn-close-abono-modal" type="button">Cerrar</button>
+                </header>
+
+                <form id="abono-form" class="modal-body">
+                    <div class="amount-summary" id="abono-summary"></div>
+                    <div class="form-grid two">
+                        <label class="span-2">
+                            <span>Cliente</span>
+                            <input id="abono-cliente-dni" type="hidden">
+                            <input id="abono-cliente-nombre" type="text" readonly placeholder="Cliente seleccionado">
+                        </label>
+                        <label>
+                            <span>Monto abono</span>
+                            <input id="abono-monto" type="number" min="0.01" step="0.01" placeholder="100.00">
+                        </label>
+                        <label>
+                            <span>Fecha</span>
+                            <input id="abono-fecha" type="date">
+                        </label>
+                        <label class="span-2">
+                            <span>Observacion</span>
+                            <input id="abono-observacion" type="text" placeholder="Nota opcional">
+                        </label>
+                    </div>
+                    <footer class="modal-actions">
+                        <button class="button button-with-icon icon-cancel" id="btn-cancel-abono-modal" type="button">Cancelar</button>
+                        <button class="button button-primary button-with-icon icon-save" type="submit">Guardar abono</button>
                     </footer>
                 </form>
             </section>

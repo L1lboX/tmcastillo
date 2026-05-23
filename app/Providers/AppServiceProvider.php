@@ -6,6 +6,7 @@ use App\Models\Permission;
 use App\Models\User;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Throwable;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -36,11 +37,7 @@ class AppServiceProvider extends ServiceProvider
      */
     private function permissions(): array
     {
-        if (! $this->app->runningInConsole()) {
-            return Permission::query()->pluck('name')->all();
-        }
-
-        return [
+        $permissions = [
             'envios.view',
             'envios.create',
             'envios.update',
@@ -54,5 +51,17 @@ class AppServiceProvider extends ServiceProvider
             'users.manage',
             'roles.manage',
         ];
+
+        if ($this->app->runningInConsole()) {
+            return $permissions;
+        }
+
+        try {
+            return Permission::query()->pluck('name')->all();
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return $permissions;
+        }
     }
 }

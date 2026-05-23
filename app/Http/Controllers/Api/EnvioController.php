@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\CuentaCorriente;
 use App\Models\Envio;
 use App\Models\TipoPaquete;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,15 +20,25 @@ class EnvioController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $envios = $this->filteredQuery($request)
+        $perPage = min((int) $request->query('per_page', 15), 100);
+
+        $paginator = $this->filteredQuery($request)
             ->latest('id')
-            ->get()
-            ->map(fn (Envio $envio) => $this->format($envio));
+            ->paginate($perPage)
+            ->through(fn (Envio $envio) => $this->format($envio));
 
         return response()->json([
             'ok' => true,
-            'data' => $envios,
+            'data' => $paginator->items(),
             'next_code' => $this->nextCode(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'from' => $paginator->firstItem(),
+                'to' => $paginator->lastItem(),
+            ],
         ]);
     }
 
@@ -77,13 +88,67 @@ class EnvioController extends Controller
         $costoTransportista = $this->costoTransportista($envio);
         $monto = round((float) $validated['monto'], 2);
 
-        $envio->update([
-            'pago' => $validated['pago'],
-            'monto' => $monto,
-            'costo_transportista' => $costoTransportista,
-            'margen' => round($monto - $costoTransportista, 2),
-            'liquidado_at' => now(),
-        ]);
+        DB::transaction(function () use ($envio, $validated, $costoTransportista, $monto): void {
+            $envio->update([
+                'pago' => $validated['pago'],
+                'monto' => $monto,
+                'costo_transportista' => $costoTransportista,
+                'margen' => round($monto - $costoTransportista, 2),
+                'liquidado_at' => now(),
+            ]);
+
+            if ($validated['pago'] === 'Credito') {
+                $existe = CuentaCorriente::query()
+                    ->where('envio_id', $envio->id)
+                    ->where('tipo', 'cargo')
+                    ->exists();
+
+                if (! $existe) {
+                    $ultimoSaldo = CuentaCorriente::query()
+                        ->where('cliente_dni', $envio->cliente_dni)
+                        ->latest('id')
+                        ->value('saldo_acumulado');
+
+                    $saldoActual = $ultimoSaldo !== null ? (float) $ultimoSaldo : $this->calcularSaldoCliente($envio->cliente_dni);
+                    $nuevoSaldo = round($saldoActual + $monto, 2);
+
+                    CuentaCorriente::create([
+                        'cliente_dni' => $envio->cliente_dni,
+                        'envio_id' => $envio->id,
+                        'tipo' => 'cargo',
+                        'monto' => $monto,
+                        'saldo_acumulado' => $nuevoSaldo,
+                        'fecha' => $envio->fecha,
+                        'observacion' => 'Cargo automatico por envio '.$envio->codigo.' (Credito)',
+                    ]);
+                }
+            } elseif ($validated['pago'] === 'Pagado') {
+                $cargos = CuentaCorriente::query()
+                    ->where('envio_id', $envio->id)
+                    ->where('tipo', 'cargo')
+                    ->sum('monto');
+
+                if ((float) $cargos > 0) {
+                    $ultimoSaldo = CuentaCorriente::query()
+                        ->where('cliente_dni', $envio->cliente_dni)
+                        ->latest('id')
+                        ->value('saldo_acumulado');
+
+                    $saldoActual = $ultimoSaldo !== null ? (float) $ultimoSaldo : $this->calcularSaldoCliente($envio->cliente_dni);
+                    $nuevoSaldo = round($saldoActual - $monto, 2);
+
+                    CuentaCorriente::create([
+                        'cliente_dni' => $envio->cliente_dni,
+                        'envio_id' => $envio->id,
+                        'tipo' => 'abono',
+                        'monto' => $monto,
+                        'saldo_acumulado' => $nuevoSaldo,
+                        'fecha' => now()->format('Y-m-d'),
+                        'observacion' => 'Abono automatico por envio '.$envio->codigo.' (Pagado)',
+                    ]);
+                }
+            }
+        });
 
         return response()->json([
             'ok' => true,
@@ -525,5 +590,20 @@ XML;
         $precio = (float) ($envio->tipoPaquete?->precio_transportista ?? 0);
 
         return round($envio->cantidad * $precio, 2);
+    }
+
+    private function calcularSaldoCliente(string $dni): float
+    {
+        $cargos = CuentaCorriente::query()
+            ->where('cliente_dni', $dni)
+            ->where('tipo', 'cargo')
+            ->sum('monto');
+
+        $abonos = CuentaCorriente::query()
+            ->where('cliente_dni', $dni)
+            ->where('tipo', 'abono')
+            ->sum('monto');
+
+        return round(((float) $cargos - (float) $abonos), 2);
     }
 }
