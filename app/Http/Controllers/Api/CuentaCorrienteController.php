@@ -210,7 +210,13 @@ class CuentaCorrienteController extends Controller
             ->where('tipo', 'abono')
             ->sum('monto');
 
-        return round(((float) $cargos - (float) $abonos), 2);
+        $enviosCredito = Envio::query()
+            ->where('cliente_dni', $dni)
+            ->where('pago', 'Credito')
+            ->whereNotNull('monto')
+            ->sum('monto');
+
+        return round(((float) $cargos + (float) $enviosCredito - (float) $abonos), 2);
     }
 
     private function format(CuentaCorriente $cc): array

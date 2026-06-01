@@ -93,7 +93,7 @@
                 <div class="topbar-metrics">
                     <div class="metric">
                         <span id="stat-total">0</span>
-                        <small>Total</small>
+                        <small>Registros</small>
                     </div>
                     <div class="metric">
                         <span id="stat-hoy">0</span>
@@ -128,56 +128,30 @@
 
                     <section class="table-shell">
                         <div class="table-tools table-tools-bar">
-                            <div class="search-group">
-                                <label class="search-field">
+                            <div class="tool-group">
+                                <label>
                                     <span>Buscar</span>
                                     <input id="search-input" type="search" placeholder="Cliente, DNI, guía o tipo">
                                 </label>
-                                <button class="button button-with-icon icon-filter" id="btn-toggle-filters" type="button">Filtros</button>
-                            </div>
-                            <strong id="count-display">0 registros</strong>
-                        </div>
-
-                        <div class="filter-panel" id="filter-panel">
-                            <div class="table-tools">
-                                <div class="tool-group">
-                                    <label>
-                                        <span>Desde</span>
-                                        <input id="filter-fecha-desde" type="date">
-                                    </label>
-                                    <label>
-                                        <span>Hasta</span>
-                                        <input id="filter-fecha-hasta" type="date">
-                                    </label>
-                                    <label>
-                                        <span>Pago</span>
-                                        <select id="filter-pago">
-                                            <option value="">Todos</option>
-                                            <option value="Pendiente">Pendiente</option>
-                                            <option value="Pagado">Pagado</option>
-                                            <option value="Contra Entrega">Contra entrega</option>
-                                            <option value="Credito">Credito</option>
-                                        </select>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div class="table-tools table-tools-secondary">
-                                <div class="tool-group">
-                                    <label>
-                                        <span>Cliente</span>
-                                        <input id="filter-cliente" type="search" placeholder="Nombre o DNI">
-                                    </label>
-                                    <label>
-                                        <span>Transportista</span>
-                                        <input id="filter-transportista" type="search" placeholder="Nombre o documento">
-                                    </label>
-                                    <label>
-                                        <span>Tipo</span>
-                                        <input id="filter-tipo" type="search" placeholder="Caja, saco...">
-                                    </label>
-                                    <button class="button button-with-icon icon-clear" id="btn-clear-filters" type="button">Limpiar filtros</button>
-                                </div>
+                                <label>
+                                    <span>Desde</span>
+                                    <input id="filter-fecha-desde" type="date">
+                                </label>
+                                <label>
+                                    <span>Hasta</span>
+                                    <input id="filter-fecha-hasta" type="date">
+                                </label>
+                                <label>
+                                    <span>Pago</span>
+                                    <select id="filter-pago">
+                                        <option value="">Todos</option>
+                                        <option value="Pendiente">Pendiente</option>
+                                        <option value="Pagado">Pagado</option>
+                                        <option value="Contra Entrega">Contra entrega</option>
+                                        <option value="Credito">Credito</option>
+                                    </select>
+                                </label>
+                                <button class="button button-with-icon icon-clear" id="btn-clear-filters" type="button">Limpiar filtros</button>
                             </div>
                         </div>
 
@@ -363,26 +337,6 @@
                         </div>
                     </section>
 
-                    <section class="table-shell" style="margin-top: 1.5rem;">
-                        <div class="table-tools">
-                            <strong id="debt-movements-title">Movimientos del cliente</strong>
-                        </div>
-                        <div class="table-scroll">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Fecha</th>
-                                        <th>Tipo</th>
-                                        <th>Envio</th>
-                                        <th>Monto</th>
-                                        <th>Saldo acumulado</th>
-                                        <th>Observacion</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="debt-movements-list"></tbody>
-                            </table>
-                        </div>
-                    </section>
                 </section>
 
                 <section class="module-page hidden" data-page="dashboard">
@@ -482,7 +436,7 @@
                 <div class="form-grid two">
                     <label>
                         <span>DNI</span>
-                        <input id="client-admin-dni" type="text" maxlength="12" placeholder="DNI">
+                        <input id="client-admin-dni" type="text" inputmode="numeric" maxlength="8" placeholder="DNI">
                     </label>
                     <label>
                         <span>Nombre</span>
@@ -490,7 +444,7 @@
                     </label>
                     <label>
                         <span>Telefono</span>
-                        <input id="client-admin-phone" type="text" maxlength="20" placeholder="987654321">
+                        <input id="client-admin-phone" type="text" inputmode="numeric" maxlength="9" placeholder="987654321">
                     </label>
                     <label>
                         <span>Direccion</span>
@@ -582,7 +536,7 @@
                         <div class="form-grid four">
                             <label>
                                 <span>DNI</span>
-                                <input type="text" id="client-inline-dni" maxlength="12" placeholder="DNI">
+                                <input type="text" id="client-inline-dni" inputmode="numeric" maxlength="8" placeholder="DNI">
                             </label>
                             <label class="span-3">
                                 <span>Nombre completo</span>
@@ -590,7 +544,7 @@
                             </label>
                             <label class="span-2">
                             <span>Telefono</span>
-                                <input type="text" id="client-inline-phone" maxlength="9" placeholder="987654321">
+                                <input type="text" id="client-inline-phone" inputmode="numeric" maxlength="9" placeholder="987654321">
                             </label>
                             <label class="span-2">
                                 <span>Direccion / destino</span>
@@ -873,6 +827,33 @@
                         <button class="button button-primary button-with-icon icon-save" type="submit">Guardar abono</button>
                     </footer>
                 </form>
+            </section>
+        </div>
+
+        <div class="modal-backdrop" id="movements-modal" aria-hidden="true">
+            <section class="modal modal-small" role="dialog" aria-modal="true" aria-labelledby="movements-modal-title">
+                <header class="modal-head">
+                    <h2 id="movements-modal-title">Movimientos del cliente</h2>
+                    <button class="button button-with-icon icon-close" id="btn-close-movements-modal" type="button">Cerrar</button>
+                </header>
+                <div class="modal-body">
+                    <div class="amount-summary" id="movements-summary" style="margin-bottom: 1rem;"></div>
+                    <div class="table-scroll" style="max-height: 50vh;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Tipo</th>
+                                    <th>Envio</th>
+                                    <th>Monto</th>
+                                    <th>Saldo acumulado</th>
+                                    <th>Observacion</th>
+                                </tr>
+                            </thead>
+                            <tbody id="movements-modal-list"></tbody>
+                        </table>
+                    </div>
+                </div>
             </section>
         </div>
     @endcan

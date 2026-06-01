@@ -62,9 +62,9 @@ class ClienteController extends Controller
         $dni = trim((string) ($request->input('dni') ?? $request->input('cliente_dni', '')));
         $nombre = trim((string) ($request->input('nombre') ?? $request->input('cliente', '')));
 
-        if ($dni === '' || strlen($dni) < 7) {
+        if ($dni === '' || strlen($dni) !== 8 || !preg_match('/^\d+$/', $dni)) {
             throw ValidationException::withMessages([
-                'dni' => 'El DNI debe tener al menos 7 caracteres.',
+                'dni' => 'El DNI debe tener 8 dígitos numéricos.',
             ]);
         }
 
@@ -74,10 +74,17 @@ class ClienteController extends Controller
             ]);
         }
 
+        $telefono = trim((string) $request->input('telefono', ''));
+        if ($telefono !== '' && (!preg_match('/^\d+$/', $telefono) || strlen($telefono) !== 9)) {
+            throw ValidationException::withMessages([
+                'telefono' => 'El teléfono debe tener 9 dígitos numéricos.',
+            ]);
+        }
+
         return [
             'dni' => $dni,
             'nombre' => $nombre,
-            'telefono' => trim((string) $request->input('telefono', '')) ?: null,
+            'telefono' => $telefono ?: null,
             'direccion' => trim((string) $request->input('direccion', '')) ?: null,
         ];
     }

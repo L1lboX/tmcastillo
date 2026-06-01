@@ -21,9 +21,6 @@ const state = {
         pago: "",
         fecha_desde: "",
         fecha_hasta: "",
-        cliente: "",
-        transportista: "",
-        tipo: "",
     },
     spec: { tamano: "", peso: "" },
 };
@@ -218,9 +215,9 @@ function bindEvents() {
     on("#btn-close-abono-modal", "click", closeAbonoModal);
     on("#btn-cancel-abono-modal", "click", closeAbonoModal);
     on("#abono-form", "submit", saveAbono);
+    on("#btn-close-movements-modal", "click", closeMovementsModal);
     on("#btn-export", "click", exportEnvios);
     on("#btn-clear-filters", "click", clearFilters);
-    on("#btn-toggle-filters", "click", toggleFilterPanel);
     $("#envio-modal")?.addEventListener("click", (event) => {
         if (event.target.id === "envio-modal") closeModal();
     });
@@ -245,6 +242,9 @@ function bindEvents() {
     $("#abono-modal")?.addEventListener("click", (event) => {
         if (event.target.id === "abono-modal") closeAbonoModal();
     });
+    $("#movements-modal")?.addEventListener("click", (event) => {
+        if (event.target.id === "movements-modal") closeMovementsModal();
+    });
     $("#details-modal")?.addEventListener("click", (event) => {
         if (event.target.id === "details-modal") closeDetailsModal();
     });
@@ -253,9 +253,6 @@ function bindEvents() {
     $("#filter-pago").addEventListener("change", (event) => setFilter("pago", event.target.value));
     $("#filter-fecha-desde").addEventListener("change", (event) => setFilter("fecha_desde", event.target.value));
     $("#filter-fecha-hasta").addEventListener("change", (event) => setFilter("fecha_hasta", event.target.value));
-    $("#filter-cliente").addEventListener("input", debounce((event) => setFilter("cliente", event.target.value.trim()), 250));
-    $("#filter-transportista").addEventListener("input", debounce((event) => setFilter("transportista", event.target.value.trim()), 250));
-    $("#filter-tipo").addEventListener("input", debounce((event) => setFilter("tipo", event.target.value.trim()), 250));
 
     $("#debt-client-search")?.addEventListener("input", debounce((event) => filterDebtClients(event.target.value.trim()), 250));
 
@@ -304,7 +301,6 @@ function showSection(section) {
     $("#section-title").textContent = title;
     $("#section-subtitle").textContent = subtitle;
     closeSidebarMenu();
-    closeFilterPanel();
 
     if (section === "clientes" || section === "transportistas") {
         loadManagementLists();
@@ -346,19 +342,6 @@ function closeSidebarMenu() {
     toggles.forEach((btn) => btn.setAttribute("aria-expanded", "false"));
 }
 
-function toggleFilterPanel() {
-    const panel = $("#filter-panel");
-    const btn = $("#btn-toggle-filters");
-    const isOpen = panel?.classList.toggle("open") ?? false;
-    btn?.setAttribute("aria-expanded", String(isOpen));
-}
-
-function closeFilterPanel() {
-    const panel = $("#filter-panel");
-    const btn = $("#btn-toggle-filters");
-    panel?.classList.remove("open");
-    btn?.setAttribute("aria-expanded", "false");
-}
 
 function setFilter(key, value) {
     state.filters[key] = value;
@@ -395,13 +378,6 @@ async function loadStats() {
         if ($("#stat-pendientes")) $("#stat-pendientes").textContent = response.data.pendientes_monto;
     } catch {
         // stats fail silently
-    }
-
-    const { page, lastPage, total } = state.pagination;
-    if (lastPage > 1) {
-        $("#count-display").textContent = `Pág. ${page} de ${lastPage} · ${total} registros`;
-    } else {
-        $("#count-display").textContent = `${total || state.envios.length} registros`;
     }
 }
 
@@ -623,9 +599,6 @@ async function saveAbono(event) {
         closeAbonoModal();
         showToast("Abono registrado correctamente.");
         loadDebtClients();
-        if (state.selectedDebtClient) {
-            loadDebtMovements(state.selectedDebtClient.dni);
-        }
     } catch (error) {
         showToast(error.message, "error");
     }
@@ -653,7 +626,6 @@ function renderDebtClients() {
 
     if (!state.debtClients.length) {
         list.innerHTML = `<tr><td class="empty-state" colspan="5">No hay clientes con deuda pendiente.</td></tr>`;
-        $("#debt-movements-list").innerHTML = `<tr><td class="empty-state" colspan="6">Selecciona un cliente para ver sus movimientos.</td></tr>`;
         return;
     }
 
@@ -674,12 +646,12 @@ function renderDebtClients() {
 
     list.querySelectorAll("[data-abono]").forEach((button) => {
         button.addEventListener("click", () => {
-            openAbonoModalForClient(button.dataset.dni, button.dataset.nombre, Number(button.dataset.saldo));
+            openAbonoModalForClient(button.dataset.abono, button.dataset.nombre, Number(button.dataset.saldo));
         });
     });
 
     list.querySelectorAll("[data-movements]").forEach((button) => {
-        button.addEventListener("click", () => loadDebtMovements(button.dataset.movements));
+        button.addEventListener("click", () => openMovementsModal(button.dataset.movements));
     });
 }
 
@@ -721,33 +693,45 @@ function filterDebtClients(search) {
 
     list.querySelectorAll("[data-abono]").forEach((button) => {
         button.addEventListener("click", () => {
-            openAbonoModalForClient(button.dataset.dni, button.dataset.nombre, Number(button.dataset.saldo));
+            openAbonoModalForClient(button.dataset.abono, button.dataset.nombre, Number(button.dataset.saldo));
         });
     });
 
     list.querySelectorAll("[data-movements]").forEach((button) => {
-        button.addEventListener("click", () => loadDebtMovements(button.dataset.movements));
+        button.addEventListener("click", () => openMovementsModal(button.dataset.movements));
     });
 }
 
-async function loadDebtMovements(dni) {
-    if (!$("#debt-movements-list")) return;
+async function openMovementsModal(dni) {
+    const cliente = state.debtClients.find((c) => c.dni === dni);
+    $("#movements-modal-title").textContent = cliente ? `Movimientos de ${cliente.nombre}` : "Movimientos del cliente";
+    $("#movements-summary").innerHTML = cliente
+        ? `<strong>${escapeHtml(cliente.nombre)}</strong><span>DNI: ${escapeHtml(cliente.dni)} · Saldo pendiente: ${money(cliente.saldo_pendiente)}</span>`
+        : "";
+    $("#movements-modal-list").innerHTML = `<tr><td class="empty-state" colspan="6">Cargando...</td></tr>`;
+    $("#movements-modal").classList.add("open");
+    $("#movements-modal").setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
 
     try {
         const response = await api.get(`/cuentas-corrientes?cliente_dni=${dni}`);
         state.debtMovements = response.data;
-        renderDebtMovements(dni);
+        renderDebtMovementsInModal();
     } catch (error) {
         showToast(error.message, "error");
+        $("#movements-modal-list").innerHTML = `<tr><td class="empty-state" colspan="6">Error al cargar movimientos.</td></tr>`;
     }
 }
 
-function renderDebtMovements(dni) {
-    const list = $("#debt-movements-list");
-    if (!list) return;
+function closeMovementsModal() {
+    $("#movements-modal").classList.remove("open");
+    $("#movements-modal").setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+}
 
-    const cliente = state.debtClients.find((c) => c.dni === dni);
-    $("#debt-movements-title").textContent = cliente ? `Movimientos de ${cliente.nombre}` : "Movimientos del cliente";
+function renderDebtMovementsInModal() {
+    const list = $("#movements-modal-list");
+    if (!list) return;
 
     if (!state.debtMovements.length) {
         list.innerHTML = `<tr><td class="empty-state" colspan="6">No hay movimientos registrados.</td></tr>`;
@@ -804,6 +788,11 @@ function setToday() {
 
 async function saveClient() {
     const payload = clientPayload();
+    const error = validateClientPayload(payload);
+    if (error) {
+        showToast(error, "error");
+        return;
+    }
 
     try {
         const response = await api.post("/clientes", payload);
@@ -827,6 +816,12 @@ async function saveAdminClient(event) {
         telefono: $("#client-admin-phone").value.trim(),
         direccion: $("#client-admin-address").value.trim(),
     };
+
+    const error = validateClientPayload(payload);
+    if (error) {
+        showToast(error, "error");
+        return;
+    }
 
     try {
         await api.post("/clientes", payload);
@@ -933,7 +928,7 @@ function clearSelectedClient(clearSearch = true) {
 }
 
 function showClientNotFound(search) {
-    const looksLikeDni = /^\d{7,12}$/.test(search);
+    const looksLikeDni = /^\d{8}$/.test(search);
     $("#client-inline-dni").value = looksLikeDni ? search : "";
     $("#client-inline-name").value = looksLikeDni ? "" : search;
     $("#client-not-found").classList.remove("hidden");
@@ -1209,6 +1204,19 @@ function clientPayload() {
     };
 }
 
+function validateClientPayload(payload) {
+    if (!/^\d{8}$/.test(payload.dni)) {
+        return "El DNI debe tener 8 digitos numericos.";
+    }
+    if (!payload.nombre) {
+        return "El nombre del cliente es requerido.";
+    }
+    if (payload.telefono && !/^\d{9}$/.test(payload.telefono)) {
+        return "El telefono debe tener 9 digitos numericos.";
+    }
+    return null;
+}
+
 function validate(payload) {
     let valid = true;
     const required = {
@@ -1239,18 +1247,12 @@ function clearFilters() {
         pago: "",
         fecha_desde: "",
         fecha_hasta: "",
-        cliente: "",
-        transportista: "",
-        tipo: "",
     };
     state.pagination.page = 1;
     $("#search-input").value = "";
     $("#filter-pago").value = "";
     $("#filter-fecha-desde").value = "";
     $("#filter-fecha-hasta").value = "";
-    $("#filter-cliente").value = "";
-    $("#filter-transportista").value = "";
-    $("#filter-tipo").value = "";
     loadEnvios();
 }
 
@@ -1468,7 +1470,7 @@ function openAmountModal(id) {
     state.liquidatingEnvioId = id;
     $("#amount-form").reset();
     $("#amount-envio-id").value = id;
-    $("#amount-payment").value = envio.pago && envio.pago !== "Pendiente" ? envio.pago : "Pagado";
+    $("#amount-payment").value = envio.pago && envio.pago !== "Pendiente" ? envio.pago : "Credito";
     $("#amount-total").value = envio.monto || "";
     $("#amount-summary").innerHTML = `
         <strong>${escapeHtml(envio.codigo)} - ${escapeHtml(envio.cliente || "Cliente")}</strong>

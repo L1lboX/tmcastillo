@@ -237,7 +237,7 @@ class EnvioController extends Controller
         $rules = [
             'codigo' => ['nullable', 'string', 'max:20'],
             'fecha' => ['required', 'date'],
-            'cliente_dni' => ['required', 'string', 'min:7', 'max:12'],
+            'cliente_dni' => ['required', 'string', 'size:8', 'regex:/^\d+$/'],
             'transportista_id' => ['nullable', 'integer', 'exists:transportistas,id'],
             'cantidad' => ['required', 'integer', 'min:1'],
             'tipo' => ['required', 'string', 'max:80'],
@@ -604,6 +604,12 @@ XML;
             ->where('tipo', 'abono')
             ->sum('monto');
 
-        return round(((float) $cargos - (float) $abonos), 2);
+        $enviosCredito = Envio::query()
+            ->where('cliente_dni', $dni)
+            ->where('pago', 'Credito')
+            ->whereNotNull('monto')
+            ->sum('monto');
+
+        return round(((float) $cargos + (float) $enviosCredito - (float) $abonos), 2);
     }
 }
