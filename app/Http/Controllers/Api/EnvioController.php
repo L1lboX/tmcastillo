@@ -53,9 +53,11 @@ class EnvioController extends Controller
     public function store(Request $request): JsonResponse
     {
         $envio = DB::transaction(function () use ($request): Envio {
-            ClienteController::upsertFromEnvio($request);
+            $cliente = ClienteController::upsertFromEnvio($request);
+            $data = $this->payload($request);
+            $data['cliente_id'] = (int) ($request->input('cliente_id') ?: $cliente->id);
 
-            return Envio::query()->create($this->payload($request));
+            return Envio::query()->create($data);
         });
 
         return response()->json([
@@ -67,8 +69,10 @@ class EnvioController extends Controller
     public function update(Request $request, Envio $envio): JsonResponse
     {
         DB::transaction(function () use ($request, $envio): void {
-            ClienteController::upsertFromEnvio($request);
-            $envio->update($this->payload($request, $envio));
+            $cliente = ClienteController::upsertFromEnvio($request);
+            $data = $this->payload($request, $envio);
+            $data['cliente_id'] = (int) ($request->input('cliente_id') ?: $cliente->id);
+            $envio->update($data);
         });
 
         return response()->json([
@@ -105,15 +109,15 @@ class EnvioController extends Controller
 
                 if (! $existe) {
                     $ultimoSaldo = CuentaCorriente::query()
-                        ->where('cliente_dni', $envio->cliente_dni)
+                        ->where('cliente_id', $envio->cliente_id)
                         ->latest('id')
                         ->value('saldo_acumulado');
 
-                    $saldoActual = $ultimoSaldo !== null ? (float) $ultimoSaldo : $this->calcularSaldoCliente($envio->cliente_dni);
+                    $saldoActual = $ultimoSaldo !== null ? (float) $ultimoSaldo : $this->calcularSaldoCliente($envio->cliente_id);
                     $nuevoSaldo = round($saldoActual + $monto, 2);
 
                     CuentaCorriente::create([
-                        'cliente_dni' => $envio->cliente_dni,
+                        'cliente_id' => $envio->cliente_id,
                         'envio_id' => $envio->id,
                         'tipo' => 'cargo',
                         'monto' => $monto,
@@ -130,15 +134,15 @@ class EnvioController extends Controller
 
                 if ((float) $cargos > 0) {
                     $ultimoSaldo = CuentaCorriente::query()
-                        ->where('cliente_dni', $envio->cliente_dni)
+                        ->where('cliente_id', $envio->cliente_id)
                         ->latest('id')
                         ->value('saldo_acumulado');
 
-                    $saldoActual = $ultimoSaldo !== null ? (float) $ultimoSaldo : $this->calcularSaldoCliente($envio->cliente_dni);
+                    $saldoActual = $ultimoSaldo !== null ? (float) $ultimoSaldo : $this->calcularSaldoCliente($envio->cliente_id);
                     $nuevoSaldo = round($saldoActual - $monto, 2);
 
                     CuentaCorriente::create([
-                        'cliente_dni' => $envio->cliente_dni,
+                        'cliente_id' => $envio->cliente_id,
                         'envio_id' => $envio->id,
                         'tipo' => 'abono',
                         'monto' => $monto,
@@ -187,7 +191,7 @@ class EnvioController extends Controller
             'Codigo',
             'Fecha',
             'Cliente',
-            'DNI',
+            'Documento',
             'Telefono',
             'Direccion',
             'Transportista',
@@ -206,7 +210,7 @@ class EnvioController extends Controller
                 $envio['codigo'],
                 $envio['fecha'],
                 $envio['cliente'],
-                $envio['cliente_dni'],
+                $envio['cliente_dni'] ?? '-',
                 $envio['telefono'],
                 $envio['direccion'],
                 $envio['transportista'],
@@ -237,7 +241,7 @@ class EnvioController extends Controller
         $rules = [
             'codigo' => ['nullable', 'string', 'max:20'],
             'fecha' => ['required', 'date'],
-            'cliente_dni' => ['required', 'string', 'size:8', 'regex:/^\d+$/'],
+            'cliente_id' => ['nullable', 'integer', 'exists:clientes,id'],
             'transportista_id' => ['nullable', 'integer', 'exists:transportistas,id'],
             'cantidad' => ['required', 'integer', 'min:1'],
             'tipo' => ['required', 'string', 'max:80'],
@@ -274,7 +278,6 @@ class EnvioController extends Controller
         $data = [
             'codigo' => trim((string) ($validated['codigo'] ?? '')) ?: $this->nextCode(),
             'fecha' => $validated['fecha'],
-            'cliente_dni' => trim($validated['cliente_dni']),
             'transportista_id' => $validated['transportista_id'] ?? null,
             'cantidad' => (int) $validated['cantidad'],
             'tipo' => trim($validated['tipo']),
@@ -559,7 +562,9 @@ XML;
             'id' => $envio->id,
             'codigo' => $envio->codigo,
             'fecha' => $envio->fecha?->format('Y-m-d'),
-            'cliente_dni' => $envio->cliente_dni,
+            'cliente_id' => $envio->cliente_id,
+            'cliente_dni' => $envio->cliente?->dni,
+            'cliente_tipo_documento' => $envio->cliente?->tipo_documento,
             'cliente' => $envio->cliente?->nombre,
             'telefono' => $envio->cliente?->telefono,
             'direccion' => $envio->cliente?->direccion,
@@ -592,20 +597,20 @@ XML;
         return round($envio->cantidad * $precio, 2);
     }
 
-    private function calcularSaldoCliente(string $dni): float
+    private function calcularSaldoCliente(int $clienteId): float
     {
         $cargos = CuentaCorriente::query()
-            ->where('cliente_dni', $dni)
+            ->where('cliente_id', $clienteId)
             ->where('tipo', 'cargo')
             ->sum('monto');
 
         $abonos = CuentaCorriente::query()
-            ->where('cliente_dni', $dni)
+            ->where('cliente_id', $clienteId)
             ->where('tipo', 'abono')
             ->sum('monto');
 
         $enviosCredito = Envio::query()
-            ->where('cliente_dni', $dni)
+            ->where('cliente_id', $clienteId)
             ->where('pago', 'Credito')
             ->whereNotNull('monto')
             ->sum('monto');

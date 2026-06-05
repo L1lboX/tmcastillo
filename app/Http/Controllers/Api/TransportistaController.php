@@ -12,18 +12,26 @@ class TransportistaController extends Controller
     public function index(Request $request): JsonResponse
     {
         $term = trim((string) $request->query('search', ''));
+        $activeOnly = $request->boolean('active_only');
+        $tipoFilter = trim((string) $request->query('tipo', ''));
 
         $transportistas = Transportista::query()
+            ->when($activeOnly, fn ($q) => $q->where('activo', true))
+            ->when($tipoFilter !== '', fn ($q) => $q->whereJsonContains('tipos', $tipoFilter))
             ->when($term !== '', function ($query) use ($term): void {
                 $query->where('nombre', 'like', "%{$term}%")
                     ->orWhere('documento', 'like', "%{$term}%");
             })
-            ->where('activo', true)
             ->orderBy('nombre')
             ->limit($term === '' ? 50 : 20)
             ->get();
 
         return response()->json(['ok' => true, 'data' => $transportistas]);
+    }
+
+    public function show(Transportista $transportista): JsonResponse
+    {
+        return response()->json(['ok' => true, 'data' => $transportista]);
     }
 
     public function store(Request $request): JsonResponse
@@ -32,6 +40,9 @@ class TransportistaController extends Controller
             'nombre' => ['required', 'string', 'max:120'],
             'telefono' => ['nullable', 'string', 'max:20'],
             'documento' => ['nullable', 'string', 'max:20'],
+            'tipo_documento' => ['nullable', 'string', 'in:dni,ruc'],
+            'tipos' => ['nullable', 'array'],
+            'tipos.*' => ['string', 'in:encomiendas,maquinaria,camion'],
         ]);
 
         return response()->json([
@@ -40,8 +51,52 @@ class TransportistaController extends Controller
                 'nombre' => trim($payload['nombre']),
                 'telefono' => trim((string) ($payload['telefono'] ?? '')) ?: null,
                 'documento' => trim((string) ($payload['documento'] ?? '')) ?: null,
+                'tipo_documento' => $payload['tipo_documento'] ?? null,
+                'tipos' => $payload['tipos'] ?? null,
                 'activo' => true,
             ]),
         ], 201);
+    }
+
+    public function update(Request $request, Transportista $transportista): JsonResponse
+    {
+        $payload = $request->validate([
+            'nombre' => ['required', 'string', 'max:120'],
+            'telefono' => ['nullable', 'string', 'max:20'],
+            'documento' => ['nullable', 'string', 'max:20'],
+            'tipo_documento' => ['nullable', 'string', 'in:dni,ruc'],
+            'tipos' => ['nullable', 'array'],
+            'tipos.*' => ['string', 'in:encomiendas,maquinaria,camion'],
+        ]);
+
+        $transportista->update([
+            'nombre' => trim($payload['nombre']),
+            'telefono' => trim((string) ($payload['telefono'] ?? '')) ?: null,
+            'documento' => trim((string) ($payload['documento'] ?? '')) ?: null,
+            'tipo_documento' => $payload['tipo_documento'] ?? null,
+            'tipos' => $payload['tipos'] ?? null,
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'data' => $transportista->fresh(),
+        ]);
+    }
+
+    public function destroy(Transportista $transportista): JsonResponse
+    {
+        $transportista->delete();
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function toggleActive(Transportista $transportista): JsonResponse
+    {
+        $transportista->update(['activo' => !$transportista->activo]);
+
+        return response()->json([
+            'ok' => true,
+            'data' => $transportista->fresh(),
+        ]);
     }
 }

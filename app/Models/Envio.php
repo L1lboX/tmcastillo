@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 #[Fillable([
     'codigo',
     'fecha',
-    'cliente_dni',
+    'cliente_id',
     'transportista_id',
     'cantidad',
     'tipo',
@@ -33,6 +33,7 @@ class Envio extends Model
         return [
             'fecha' => 'date:Y-m-d',
             'cantidad' => 'integer',
+            'cliente_id' => 'integer',
             'monto' => 'decimal:2',
             'costo_transportista' => 'decimal:2',
             'margen' => 'decimal:2',
@@ -42,7 +43,7 @@ class Envio extends Model
 
     public function cliente(): BelongsTo
     {
-        return $this->belongsTo(Cliente::class, 'cliente_dni', 'dni');
+        return $this->belongsTo(Cliente::class);
     }
 
     public function transportista(): BelongsTo

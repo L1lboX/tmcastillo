@@ -83,13 +83,29 @@ Route::middleware('auth')->prefix('api')->group(function (): void {
 
     Route::get('/clientes', [ClienteController::class, 'index'])
         ->middleware('permission:envios.create');
+    Route::get('/clientes/{cliente}', [ClienteController::class, 'show'])
+        ->middleware('permission:envios.create');
     Route::post('/clientes', [ClienteController::class, 'store'])
+        ->middleware('permission:clientes.manage');
+    Route::put('/clientes/{cliente}', [ClienteController::class, 'update'])
+        ->middleware('permission:clientes.manage');
+    Route::delete('/clientes/{cliente}', [ClienteController::class, 'destroy'])
+        ->middleware('permission:clientes.delete');
+    Route::patch('/clientes/{cliente}/toggle', [ClienteController::class, 'toggleActive'])
         ->middleware('permission:clientes.manage');
 
     Route::get('/transportistas', [TransportistaController::class, 'index'])
         ->middleware('permission:envios.create');
+    Route::get('/transportistas/{transportista}', [TransportistaController::class, 'show'])
+        ->middleware('permission:envios.create');
     Route::post('/transportistas', [TransportistaController::class, 'store'])
         ->middleware('permission:transportistas.manage');
+    Route::put('/transportistas/{transportista}', [TransportistaController::class, 'update'])
+        ->middleware('permission:transportistas.delete');
+    Route::delete('/transportistas/{transportista}', [TransportistaController::class, 'destroy'])
+        ->middleware('permission:transportistas.delete');
+    Route::patch('/transportistas/{transportista}/toggle', [TransportistaController::class, 'toggleActive'])
+        ->middleware('permission:transportistas.delete');
 
     Route::get('/tipos-paquete', [TipoPaqueteController::class, 'index'])
         ->middleware('permission:envios.create');
@@ -119,7 +135,7 @@ Route::middleware('auth')->prefix('api')->group(function (): void {
     Route::middleware('permission:clientes.debt')->group(function (): void {
         Route::get('/cuentas-corrientes', [CuentaCorrienteController::class, 'index']);
         Route::get('/cuentas-corrientes/clientes-con-deuda', [CuentaCorrienteController::class, 'clientesConDeuda']);
-        Route::get('/cuentas-corrientes/saldo/{dni}', [CuentaCorrienteController::class, 'saldoCliente']);
+        Route::get('/cuentas-corrientes/saldo/{cliente}', [CuentaCorrienteController::class, 'saldoCliente']);
         Route::post('/cuentas-corrientes/abono', [CuentaCorrienteController::class, 'registrarAbono']);
         Route::post('/cuentas-corrientes/sync-envio/{envio}', [CuentaCorrienteController::class, 'syncEnvioCredito']);
     });

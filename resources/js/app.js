@@ -14,6 +14,8 @@ const state = {
     editingUserId: null,
     editingRoleId: null,
     editingPackageTypeId: null,
+    editingClienteId: null,
+    editingCarrierId: null,
     liquidatingEnvioId: null,
     pagination: { page: 1, lastPage: 1, total: 0 },
     filters: {
@@ -69,6 +71,13 @@ const api = {
         });
     },
 
+    patch(path, data) {
+        return this.request(path, {
+            method: "PATCH",
+            body: JSON.stringify(data),
+        });
+    },
+
     delete(path) {
         return this.request(path, { method: "DELETE" });
     },
@@ -83,6 +92,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     bindEvents();
     setToday();
+    if (can("dashboard.view")) {
+        showSection("dashboard");
+    }
     loadEnvios();
     if (can("clientes.manage") || can("transportistas.manage") || can("envios.create")) {
         loadManagementLists();
@@ -136,9 +148,14 @@ function bindEvents() {
     document.querySelectorAll("[data-section]").forEach((button) => {
         button.addEventListener("click", () => showSection(button.dataset.section));
     });
+    document.querySelectorAll("[data-toggle-group]").forEach((button) => {
+        button.addEventListener("click", () => toggleSidebarGroup(button.dataset.toggleGroup));
+    });
     on("#sidebar-toggle", "click", toggleSidebarMenu);
     on("#topbar-toggle", "click", toggleSidebarMenu);
     on("#sidebar-backdrop", "click", closeSidebarMenu);
+
+    initSidebarGroups();
 
     const debouncedClientSearch = debounce(searchClient, 220);
     const debouncedTransportistaSearch = debounce(searchTransportista, 220);
@@ -206,6 +223,7 @@ function bindEvents() {
     on("#btn-close-role-modal", "click", closeRoleModal);
     on("#btn-cancel-role-modal", "click", closeRoleModal);
     on("#btn-close-details-modal", "click", closeDetailsModal);
+    on("#btn-close-carrier-details-modal", "click", closeCarrierDetailsModal);
     on("#btn-open-package-type-modal", "click", openPackageTypeModal);
     on("#btn-close-package-type-modal", "click", closePackageTypeModal);
     on("#btn-cancel-package-type-modal", "click", closePackageTypeModal);
@@ -248,11 +266,21 @@ function bindEvents() {
     $("#details-modal")?.addEventListener("click", (event) => {
         if (event.target.id === "details-modal") closeDetailsModal();
     });
+    $("#carrier-details-modal")?.addEventListener("click", (event) => {
+        if (event.target.id === "carrier-details-modal") closeCarrierDetailsModal();
+    });
 
     $("#search-input").addEventListener("input", debounce((event) => setFilter("q", event.target.value.trim()), 250));
     $("#filter-pago").addEventListener("change", (event) => setFilter("pago", event.target.value));
     $("#filter-fecha-desde").addEventListener("change", (event) => setFilter("fecha_desde", event.target.value));
     $("#filter-fecha-hasta").addEventListener("change", (event) => setFilter("fecha_hasta", event.target.value));
+
+    $("#btn-toggle-filters").addEventListener("click", () => {
+        const panel = $("#filter-panel");
+        const btn = $("#btn-toggle-filters");
+        const open = panel.classList.toggle("open");
+        btn.setAttribute("aria-expanded", String(open));
+    });
 
     $("#debt-client-search")?.addEventListener("input", debounce((event) => filterDebtClients(event.target.value.trim()), 250));
 
@@ -297,6 +325,15 @@ function showSection(section) {
         button.classList.toggle("active", button.dataset.section === section);
     });
 
+    const activeButton = document.querySelector(`.sidebar-link[data-section="${section}"]`);
+    const parentGroup = activeButton?.closest(".sidebar-group");
+    if (parentGroup?.classList.contains("collapsed")) {
+        parentGroup.classList.remove("collapsed");
+        const savedState = JSON.parse(localStorage.getItem("sidebarGroups") || "{}");
+        savedState[parentGroup.dataset.group] = true;
+        localStorage.setItem("sidebarGroups", JSON.stringify(savedState));
+    }
+
     const [title, subtitle] = titles[section] || titles.envios;
     $("#section-title").textContent = title;
     $("#section-subtitle").textContent = subtitle;
@@ -340,6 +377,32 @@ function closeSidebarMenu() {
     sidebar?.classList.remove("open");
     backdrop?.classList.remove("open");
     toggles.forEach((btn) => btn.setAttribute("aria-expanded", "false"));
+}
+
+function initSidebarGroups() {
+    const savedState = JSON.parse(localStorage.getItem("sidebarGroups") || "{}");
+    const activeSection = document.querySelector(".sidebar-link.active")?.dataset.section;
+    const activeGroup = activeSection ? document.querySelector(`.sidebar-group [data-section="${activeSection}"]`)?.closest(".sidebar-group")?.dataset.group : null;
+
+    document.querySelectorAll(".sidebar-group").forEach((group) => {
+        const groupName = group.dataset.group;
+        const isCollapsed = savedState[groupName] === false;
+
+        if (isCollapsed && groupName !== activeGroup) {
+            group.classList.add("collapsed");
+        }
+    });
+}
+
+function toggleSidebarGroup(groupName) {
+    const group = document.querySelector(`.sidebar-group[data-group="${groupName}"]`);
+    if (!group) return;
+
+    group.classList.toggle("collapsed");
+
+    const savedState = JSON.parse(localStorage.getItem("sidebarGroups") || "{}");
+    savedState[groupName] = !group.classList.contains("collapsed");
+    localStorage.setItem("sidebarGroups", JSON.stringify(savedState));
 }
 
 
@@ -409,10 +472,10 @@ function renderTable() {
                 ${can("envios.amounts") ? `<td class="col-hide-mob cell-code">${money(envio.monto)}</td>` : ""}
                 <td>
                     <div class="row-actions">
-                        <button class="button icon-only icon-details" type="button" data-details="${envio.id}" title="Ver detalles" aria-label="Ver detalles"></button>
-                        ${can("envios.amounts") ? `<button class="button icon-only icon-money" type="button" data-amount="${envio.id}" title="Registrar monto" aria-label="Registrar monto"></button>` : ""}
-                        ${can("envios.update") ? `<button class="button icon-only icon-edit" type="button" data-edit="${envio.id}" title="Editar" aria-label="Editar"></button>` : ""}
-                        ${can("envios.delete") ? `<button class="button button-danger icon-only icon-delete" type="button" data-delete="${envio.id}" title="Eliminar" aria-label="Eliminar"></button>` : ""}
+                        <span class="material-icon" data-details="${envio.id}" title="Ver detalles" role="button" tabindex="0" aria-label="Ver detalles">info</span>
+                        ${can("envios.amounts") ? `<span class="material-icon" data-amount="${envio.id}" title="Registrar monto" role="button" tabindex="0" aria-label="Registrar monto">payments</span>` : ""}
+                        ${can("envios.update") ? `<span class="material-icon" data-edit="${envio.id}" title="Editar" role="button" tabindex="0" aria-label="Editar">edit</span>` : ""}
+                        ${can("envios.delete") ? `<span class="material-icon delete" data-delete="${envio.id}" title="Eliminar" role="button" tabindex="0" aria-label="Eliminar">delete</span>` : ""}
                     </div>
                 </td>
             </tr>
@@ -502,6 +565,8 @@ function closeModal() {
 
 function openClientModal() {
     $("#client-admin-form").reset();
+    $("#client-modal-title").textContent = "Registrar cliente";
+    state.editingClienteId = null;
     $("#client-modal").classList.add("open");
     $("#client-modal").setAttribute("aria-hidden", "false");
     document.body.style.overflow = "hidden";
@@ -511,10 +576,14 @@ function closeClientModal() {
     $("#client-modal").classList.remove("open");
     $("#client-modal").setAttribute("aria-hidden", "true");
     document.body.style.overflow = "";
+    state.editingClienteId = null;
 }
 
 function openCarrierModal() {
     $("#carrier-admin-form").reset();
+    document.querySelectorAll('input[name="carrier-tipo"]').forEach((cb) => { cb.checked = false; });
+    $("#carrier-modal-title").textContent = "Registrar transportista";
+    state.editingCarrierId = null;
     $("#carrier-modal").classList.add("open");
     $("#carrier-modal").setAttribute("aria-hidden", "false");
     document.body.style.overflow = "hidden";
@@ -524,6 +593,7 @@ function closeCarrierModal() {
     $("#carrier-modal").classList.remove("open");
     $("#carrier-modal").setAttribute("aria-hidden", "true");
     document.body.style.overflow = "";
+    state.editingCarrierId = null;
 }
 
 function closeDetailsModal() {
@@ -555,7 +625,7 @@ function closeAmountModal() {
 
 function openAbonoModal() {
     $("#abono-form").reset();
-    $("#abono-cliente-dni").value = "";
+    $("#abono-cliente-id").value = "";
     $("#abono-cliente-nombre").value = "";
     $("#abono-fecha").value = new Date().toISOString().slice(0, 10);
     $("#abono-summary").innerHTML = '<small>Selecciona un cliente de la lista para registrar un abono.</small>';
@@ -564,10 +634,11 @@ function openAbonoModal() {
     document.body.style.overflow = "hidden";
 }
 
-function openAbonoModalForClient(dni, nombre, saldo) {
-    state.selectedDebtClient = { dni, nombre, saldo };
-    $("#abono-cliente-dni").value = dni;
-    $("#abono-cliente-nombre").value = `${nombre} (DNI: ${dni})`;
+function openAbonoModalForClient(id, dni, nombre, saldo) {
+    state.selectedDebtClient = { id, dni, nombre, saldo };
+    $("#abono-cliente-id").value = id;
+    const docLabel = dni ? ` (${dni})` : "";
+    $("#abono-cliente-nombre").value = `${nombre}${docLabel}`;
     $("#abono-summary").innerHTML = `
         <strong>${escapeHtml(nombre)}</strong>
         <span>Saldo pendiente: ${money(saldo)}</span>
@@ -588,7 +659,7 @@ async function saveAbono(event) {
     event.preventDefault();
 
     const payload = {
-        cliente_dni: $("#abono-cliente-dni").value,
+        cliente_id: parseInt($("#abono-cliente-id").value, 10),
         monto: $("#abono-monto").value,
         fecha: $("#abono-fecha").value,
         observacion: $("#abono-observacion").value.trim() || null,
@@ -629,29 +700,39 @@ function renderDebtClients() {
         return;
     }
 
-    list.innerHTML = state.debtClients.map((cliente) => `
+    list.innerHTML = state.debtClients.map((cliente) => {
+        let docDisplay = "-";
+        if (cliente.dni) {
+            docDisplay = escapeHtml(cliente.dni);
+        }
+        return `
         <tr>
-            <td class="cell-code">${escapeHtml(cliente.dni)}</td>
+            <td class="cell-code">${docDisplay}</td>
             <td><strong>${escapeHtml(cliente.nombre)}</strong></td>
             <td class="cell-muted">${escapeHtml(cliente.telefono || "-")}</td>
             <td class="cell-code" style="color: #f59e0b;">${money(cliente.saldo_pendiente)}</td>
             <td>
                 <div class="row-actions">
-                    <button class="button button-primary button-with-icon icon-money" type="button" data-abono="${escapeHtml(cliente.dni)}" data-nombre="${escapeHtml(cliente.nombre)}" data-saldo="${cliente.saldo_pendiente}">Abonar</button>
-                    <button class="button button-with-icon icon-details" type="button" data-movements="${escapeHtml(cliente.dni)}" title="Ver movimientos">Movimientos</button>
+                    <button class="button button-primary button-with-icon" type="button" data-abono-id="${cliente.id}" data-abono-dni="${escapeHtml(cliente.dni || "")}" data-abono-nombre="${escapeHtml(cliente.nombre)}" data-abono-saldo="${cliente.saldo_pendiente}"><span class="material-icon">payments</span>Abonar</button>
+                    <button class="button button-with-icon" type="button" data-movements="${cliente.id}" title="Ver movimientos"><span class="material-icon">receipt_long</span>Movimientos</button>
                 </div>
             </td>
-        </tr>
-    `).join("");
+        </tr>`;
+    }).join("");
 
-    list.querySelectorAll("[data-abono]").forEach((button) => {
+    list.querySelectorAll("[data-abono-id]").forEach((button) => {
         button.addEventListener("click", () => {
-            openAbonoModalForClient(button.dataset.abono, button.dataset.nombre, Number(button.dataset.saldo));
+            openAbonoModalForClient(
+                parseInt(button.dataset.abonoId, 10),
+                button.dataset.abonoDni || null,
+                button.dataset.abonoNombre,
+                Number(button.dataset.abonoSaldo)
+            );
         });
     });
 
     list.querySelectorAll("[data-movements]").forEach((button) => {
-        button.addEventListener("click", () => openMovementsModal(button.dataset.movements));
+        button.addEventListener("click", () => openMovementsModal(parseInt(button.dataset.movements, 10)));
     });
 }
 
@@ -664,7 +745,7 @@ function filterDebtClients(search) {
 
     const filtered = state.debtClients.filter((c) =>
         c.nombre.toLowerCase().includes(search.toLowerCase()) ||
-        c.dni.includes(search)
+        (c.dni && c.dni.includes(search))
     );
 
     const totalDeuda = filtered.reduce((sum, c) => sum + Number(c.saldo_pendiente || 0), 0);
@@ -676,37 +757,48 @@ function filterDebtClients(search) {
         return;
     }
 
-    list.innerHTML = filtered.map((cliente) => `
+    list.innerHTML = filtered.map((cliente) => {
+        let docDisplay = "-";
+        if (cliente.dni) {
+            docDisplay = escapeHtml(cliente.dni);
+        }
+        return `
         <tr>
-            <td class="cell-code">${escapeHtml(cliente.dni)}</td>
+            <td class="cell-code">${docDisplay}</td>
             <td><strong>${escapeHtml(cliente.nombre)}</strong></td>
             <td class="cell-muted">${escapeHtml(cliente.telefono || "-")}</td>
             <td class="cell-code" style="color: #f59e0b;">${money(cliente.saldo_pendiente)}</td>
             <td>
                 <div class="row-actions">
-                    <button class="button button-primary button-with-icon icon-money" type="button" data-abono="${escapeHtml(cliente.dni)}" data-nombre="${escapeHtml(cliente.nombre)}" data-saldo="${cliente.saldo_pendiente}">Abonar</button>
-                    <button class="button button-with-icon icon-details" type="button" data-movements="${escapeHtml(cliente.dni)}" title="Ver movimientos">Movimientos</button>
+                    <button class="button button-primary button-with-icon" type="button" data-abono-id="${cliente.id}" data-abono-dni="${escapeHtml(cliente.dni || "")}" data-abono-nombre="${escapeHtml(cliente.nombre)}" data-abono-saldo="${cliente.saldo_pendiente}"><span class="material-icon">payments</span>Abonar</button>
+                    <button class="button button-with-icon" type="button" data-movements="${cliente.id}" title="Ver movimientos"><span class="material-icon">receipt_long</span>Movimientos</button>
                 </div>
             </td>
-        </tr>
-    `).join("");
+        </tr>`;
+    }).join("");
 
-    list.querySelectorAll("[data-abono]").forEach((button) => {
+    list.querySelectorAll("[data-abono-id]").forEach((button) => {
         button.addEventListener("click", () => {
-            openAbonoModalForClient(button.dataset.abono, button.dataset.nombre, Number(button.dataset.saldo));
+            openAbonoModalForClient(
+                parseInt(button.dataset.abonoId, 10),
+                button.dataset.abonoDni || null,
+                button.dataset.abonoNombre,
+                Number(button.dataset.abonoSaldo)
+            );
         });
     });
 
     list.querySelectorAll("[data-movements]").forEach((button) => {
-        button.addEventListener("click", () => openMovementsModal(button.dataset.movements));
+        button.addEventListener("click", () => openMovementsModal(parseInt(button.dataset.movements, 10)));
     });
 }
 
-async function openMovementsModal(dni) {
-    const cliente = state.debtClients.find((c) => c.dni === dni);
+async function openMovementsModal(id) {
+    const cliente = state.debtClients.find((c) => c.id === id);
+    const docInfo = cliente && cliente.dni ? ` (${cliente.dni})` : "";
     $("#movements-modal-title").textContent = cliente ? `Movimientos de ${cliente.nombre}` : "Movimientos del cliente";
     $("#movements-summary").innerHTML = cliente
-        ? `<strong>${escapeHtml(cliente.nombre)}</strong><span>DNI: ${escapeHtml(cliente.dni)} · Saldo pendiente: ${money(cliente.saldo_pendiente)}</span>`
+        ? `<strong>${escapeHtml(cliente.nombre)}</strong><span>${cliente.dni ? "Documento: " + escapeHtml(cliente.dni) + " · " : ""}Saldo pendiente: ${money(cliente.saldo_pendiente)}</span>`
         : "";
     $("#movements-modal-list").innerHTML = `<tr><td class="empty-state" colspan="6">Cargando...</td></tr>`;
     $("#movements-modal").classList.add("open");
@@ -714,7 +806,7 @@ async function openMovementsModal(dni) {
     document.body.style.overflow = "hidden";
 
     try {
-        const response = await api.get(`/cuentas-corrientes?cliente_dni=${dni}`);
+        const response = await api.get(`/cuentas-corrientes?cliente_id=${id}`);
         state.debtMovements = response.data;
         renderDebtMovementsInModal();
     } catch (error) {
@@ -759,6 +851,7 @@ function resetForm() {
     state.spec = { tamano: "", peso: "" };
     state.editingId = null;
     $("#envio-db-id").value = "";
+    $("#f-cliente-id").value = "";
     $("#f-dni").value = "";
     $("#f-nombre").value = "";
     $("#f-telefono").value = "";
@@ -811,6 +904,7 @@ async function saveAdminClient(event) {
     event.preventDefault();
 
     const payload = {
+        tipo_documento: $("#client-admin-tipo-documento").value,
         dni: $("#client-admin-dni").value.trim(),
         nombre: $("#client-admin-name").value.trim(),
         telefono: $("#client-admin-phone").value.trim(),
@@ -824,12 +918,58 @@ async function saveAdminClient(event) {
     }
 
     try {
-        await api.post("/clientes", payload);
+        if (state.editingClienteId) {
+            await api.put(`/clientes/${state.editingClienteId}`, payload);
+            showToast("Cliente actualizado correctamente.");
+        } else {
+            await api.post("/clientes", payload);
+            showToast("Cliente guardado correctamente.");
+        }
+        $("#client-admin-tipo-documento").value = "";
         ["#client-admin-dni", "#client-admin-name", "#client-admin-phone", "#client-admin-address"].forEach((selector) => {
             $(selector).value = "";
         });
         closeClientModal();
-        showToast("Cliente guardado correctamente.");
+        loadManagementLists();
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+async function editCliente(id) {
+    try {
+        const response = await api.get(`/clientes/${id}`);
+        const cliente = response.data;
+        openClientModal();
+        state.editingClienteId = cliente.id;
+        $("#client-modal-title").textContent = "Editar cliente";
+        $("#client-admin-tipo-documento").value = cliente.tipo_documento || "";
+        $("#client-admin-dni").value = cliente.dni || "";
+        $("#client-admin-name").value = cliente.nombre || "";
+        $("#client-admin-phone").value = cliente.telefono || "";
+        $("#client-admin-address").value = cliente.direccion || "";
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+async function deleteCliente(id) {
+    if (!confirm("Eliminar este cliente? Los envíos asociados no se eliminarán.")) return;
+
+    try {
+        await api.delete(`/clientes/${id}`);
+        showToast("Cliente eliminado.");
+        loadManagementLists();
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+async function toggleClienteActive(id) {
+    try {
+        const response = await api.patch(`/clientes/${id}/toggle`);
+        const cliente = response.data;
+        showToast(`Cliente ${cliente.activo ? "activado" : "desactivado"}.`);
         loadManagementLists();
     } catch (error) {
         showToast(error.message, "error");
@@ -839,19 +979,115 @@ async function saveAdminClient(event) {
 async function saveAdminCarrier(event) {
     event.preventDefault();
 
+    const tipos = Array.from(document.querySelectorAll('input[name="carrier-tipo"]:checked')).map((cb) => cb.value);
+
     const payload = {
         nombre: $("#carrier-admin-name").value.trim(),
+        tipo_documento: $("#carrier-admin-tipo-documento").value,
         documento: $("#carrier-admin-document").value.trim(),
         telefono: $("#carrier-admin-phone").value.trim(),
+        tipos: tipos.length ? tipos : null,
     };
 
     try {
-        await api.post("/transportistas", payload);
+        if (state.editingCarrierId) {
+            await api.put(`/transportistas/${state.editingCarrierId}`, payload);
+            showToast("Transportista actualizado correctamente.");
+        } else {
+            await api.post("/transportistas", payload);
+            showToast("Transportista guardado correctamente.");
+        }
+        $("#carrier-admin-tipo-documento").value = "";
         ["#carrier-admin-name", "#carrier-admin-document", "#carrier-admin-phone"].forEach((selector) => {
             $(selector).value = "";
         });
+        document.querySelectorAll('input[name="carrier-tipo"]').forEach((cb) => { cb.checked = false; });
         closeCarrierModal();
-        showToast("Transportista guardado correctamente.");
+        loadManagementLists();
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+async function editCarrier(id) {
+    try {
+        const response = await api.get(`/transportistas/${id}`);
+        const carrier = response.data;
+        openCarrierModal();
+        state.editingCarrierId = carrier.id;
+        $("#carrier-modal-title").textContent = "Editar transportista";
+        $("#carrier-admin-tipo-documento").value = carrier.tipo_documento || "";
+        $("#carrier-admin-name").value = carrier.nombre || "";
+        $("#carrier-admin-document").value = carrier.documento || "";
+        $("#carrier-admin-phone").value = carrier.telefono || "";
+        const carrierTipos = carrier.tipos || [];
+        document.querySelectorAll('input[name="carrier-tipo"]').forEach((cb) => {
+            cb.checked = carrierTipos.includes(cb.value);
+        });
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+async function showCarrierDetails(id) {
+    try {
+        const response = await api.get(`/transportistas/${id}`);
+        const carrier = response.data;
+        const tipoLabels = { encomiendas: "Encomiendas", maquinaria: "Maquinaria", camion: "Camión" };
+        const tipos = carrier.tipos || [];
+        const tiposDisplay = tipos.length
+            ? tipos.map((t) => `<span class="tipo-badge tipo-badge-${t}">${tipoLabels[t] || t}</span>`).join(" ")
+            : `<span class="cell-muted">-</span>`;
+        const tipoDocDisplay = carrier.tipo_documento
+            ? `<span class="badge ${carrier.tipo_documento === "ruc" ? "contra" : "pagado"}">${carrier.tipo_documento.toUpperCase()}</span>`
+            : `<span class="cell-muted">-</span>`;
+        const docDisplay = carrier.documento
+            ? `<span class="cell-code">${escapeHtml(carrier.documento)}</span>`
+            : `<span class="cell-muted">-</span>`;
+        const estadoDisplay = `<span class="badge ${carrier.activo ? "pagado" : "contra"}">${carrier.activo ? "Activo" : "Inactivo"}</span>`;
+
+        $("#carrier-details-title").textContent = `Detalle: ${carrier.nombre}`;
+        $("#carrier-details-body").innerHTML = `
+            <div class="detail-grid">
+                <div><span>Nombre</span><strong>${escapeHtml(carrier.nombre)}</strong></div>
+                <div><span>Tipo documento</span><strong>${tipoDocDisplay}</strong></div>
+                <div><span>Documento</span><strong>${docDisplay}</strong></div>
+                <div><span>Teléfono</span><strong>${escapeHtml(carrier.telefono || "-")}</strong></div>
+                <div><span>Especialidad</span><strong>${tiposDisplay}</strong></div>
+                <div><span>Estado</span><strong>${estadoDisplay}</strong></div>
+            </div>
+        `;
+        $("#carrier-details-modal").classList.add("open");
+        $("#carrier-details-modal").setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+function closeCarrierDetailsModal() {
+    $("#carrier-details-modal").classList.remove("open");
+    $("#carrier-details-modal").setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+}
+
+async function deleteCarrier(id) {
+    if (!confirm("Eliminar este transportista?")) return;
+
+    try {
+        await api.delete(`/transportistas/${id}`);
+        showToast("Transportista eliminado.");
+        loadManagementLists();
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+async function toggleCarrierActive(id) {
+    try {
+        const response = await api.patch(`/transportistas/${id}/toggle`);
+        const carrier = response.data;
+        showToast(`Transportista ${carrier.activo ? "activado" : "desactivado"}.`);
         loadManagementLists();
     } catch (error) {
         showToast(error.message, "error");
@@ -887,17 +1123,23 @@ async function searchClient() {
 
         hideClientNotFound();
         dropdown.innerHTML = response.data.map((cliente) => `
-            <button type="button" data-dni="${escapeHtml(cliente.dni)}">
+            <button type="button" data-id="${cliente.id}" data-dni="${escapeHtml(cliente.dni || "")}" data-tipo="${escapeHtml(cliente.tipo_documento || "")}" data-nombre="${escapeHtml(cliente.nombre)}" data-telefono="${escapeHtml(cliente.telefono || "")}" data-direccion="${escapeHtml(cliente.direccion || "")}">
                 <span>${escapeHtml(cliente.nombre)}</span>
-                <small>${escapeHtml(cliente.dni)}</small>
+                <small>${cliente.dni ? (cliente.tipo_documento ? cliente.tipo_documento.toUpperCase() + ": " : "") + escapeHtml(cliente.dni) : "Sin documento"}</small>
             </button>
         `).join("");
         dropdown.classList.add("open");
 
         dropdown.querySelectorAll("button").forEach((button) => {
             button.addEventListener("click", () => {
-                const cliente = response.data.find((item) => item.dni === button.dataset.dni);
-                fillClient(cliente);
+                fillClient({
+                    id: parseInt(button.dataset.id, 10),
+                    dni: button.dataset.dni || null,
+                    tipo_documento: button.dataset.tipo || null,
+                    nombre: button.dataset.nombre,
+                    telefono: button.dataset.telefono || null,
+                    direccion: button.dataset.direccion || null,
+                });
                 dropdown.classList.remove("open");
             });
         });
@@ -907,7 +1149,8 @@ async function searchClient() {
 }
 
 function fillClient(cliente) {
-    $("#f-dni").value = cliente.dni;
+    $("#f-cliente-id").value = cliente.id;
+    $("#f-dni").value = cliente.dni || "";
     $("#f-nombre").value = cliente.nombre;
     $("#f-telefono").value = cliente.telefono || "";
     $("#f-direccion").value = cliente.direccion || "";
@@ -918,6 +1161,7 @@ function fillClient(cliente) {
 }
 
 function clearSelectedClient(clearSearch = true) {
+    $("#f-cliente-id").value = "";
     $("#f-dni").value = "";
     $("#f-nombre").value = "";
     $("#f-telefono").value = "";
@@ -929,8 +1173,18 @@ function clearSelectedClient(clearSearch = true) {
 
 function showClientNotFound(search) {
     const looksLikeDni = /^\d{8}$/.test(search);
-    $("#client-inline-dni").value = looksLikeDni ? search : "";
-    $("#client-inline-name").value = looksLikeDni ? "" : search;
+    const looksLikeRuc = /^\d{11}$/.test(search);
+    if (looksLikeDni) {
+        $("#client-inline-tipo-documento").value = "dni";
+        $("#client-inline-dni").value = search;
+    } else if (looksLikeRuc) {
+        $("#client-inline-tipo-documento").value = "ruc";
+        $("#client-inline-dni").value = search;
+    } else {
+        $("#client-inline-tipo-documento").value = "";
+        $("#client-inline-dni").value = "";
+    }
+    $("#client-inline-name").value = (looksLikeDni || looksLikeRuc) ? "" : search;
     $("#client-not-found").classList.remove("hidden");
     $("#btn-show-client-form").classList.remove("hidden");
     $("#dni-status").textContent = "";
@@ -948,6 +1202,7 @@ function showClientForm() {
 
 function hideClientForm() {
     $("#client-inline-form").classList.add("hidden");
+    $("#client-inline-tipo-documento").value = "";
     ["#client-inline-dni", "#client-inline-name", "#client-inline-phone", "#client-inline-address"].forEach((selector) => {
         $(selector).value = "";
     });
@@ -958,7 +1213,7 @@ async function searchTransportista() {
     const dropdown = $("#transportista-dropdown");
 
     try {
-        const response = await api.get(`/transportistas?search=${encodeURIComponent(search)}`);
+        const response = await api.get(`/transportistas?search=${encodeURIComponent(search)}&active_only=1`);
         if (!response.data.length) {
             dropdown.classList.remove("open");
             $("#f-transportista-id").value = "";
@@ -1054,6 +1309,7 @@ function editEnvio(id) {
     $("#envio-db-id").value = envio.id;
     $("#f-codigo").value = envio.codigo;
     $("#f-fecha").value = envio.fecha;
+    $("#f-cliente-id").value = envio.cliente_id;
     $("#f-dni").value = envio.cliente_dni;
     $("#f-nombre").value = envio.cliente;
     $("#f-cliente-search").value = envio.cliente;
@@ -1089,11 +1345,19 @@ function showDetails(id) {
     if (!envio) return;
 
     $("#details-title").textContent = `Detalle ${envio.codigo}`;
+    let docLabel = "Documento";
+    let docValue = "-";
+    if (envio.cliente_dni) {
+        const tipoDoc = envio.cliente_tipo_documento;
+        docLabel = tipoDoc ? tipoDoc.toUpperCase() : "Documento";
+        docValue = escapeHtml(envio.cliente_dni);
+    }
+
     $("#details-body").innerHTML = `
         <div class="detail-grid">
             <div><span>Fecha</span><strong>${formatDate(envio.fecha)}</strong></div>
             <div><span>Cliente</span><strong>${escapeHtml(envio.cliente)}</strong></div>
-            <div><span>DNI</span><strong>${escapeHtml(envio.cliente_dni)}</strong></div>
+            <div><span>${docLabel}</span><strong>${docValue}</strong></div>
             <div><span>Telefono</span><strong>${escapeHtml(envio.telefono || "-")}</strong></div>
             <div><span>Direccion</span><strong>${escapeHtml(envio.direccion || "-")}</strong></div>
             <div><span>Transportista</span><strong>${escapeHtml(envio.transportista || "-")}</strong></div>
@@ -1177,7 +1441,7 @@ function envioPayload() {
     return {
         codigo: $("#f-codigo").value,
         fecha: $("#f-fecha").value,
-        cliente_dni: $("#f-dni").value.trim(),
+        cliente_id: parseInt($("#f-cliente-id").value, 10) || null,
         cliente: $("#f-nombre").value.trim(),
         telefono: $("#f-telefono").value.trim(),
         direccion: $("#f-direccion").value.trim(),
@@ -1196,7 +1460,9 @@ function envioPayload() {
 }
 
 function clientPayload() {
+    const tipoDocumento = $("#client-inline-tipo-documento").value;
     return {
+        tipo_documento: tipoDocumento,
         dni: $("#client-inline-dni").value.trim(),
         nombre: $("#client-inline-name").value.trim(),
         telefono: $("#client-inline-phone").value.trim(),
@@ -1205,8 +1471,23 @@ function clientPayload() {
 }
 
 function validateClientPayload(payload) {
-    if (!/^\d{8}$/.test(payload.dni)) {
-        return "El DNI debe tener 8 digitos numericos.";
+    if (payload.tipo_documento && !payload.dni) {
+        return `El número de ${payload.tipo_documento.toUpperCase()} es requerido.`;
+    }
+    if (!payload.tipo_documento && payload.dni) {
+        if (!/^\d+$/.test(payload.dni) || ![8, 11].includes(payload.dni.length)) {
+            return "El documento debe tener 8 dígitos (DNI) o 11 dígitos (RUC).";
+        }
+    }
+    if (payload.tipo_documento === "dni" && payload.dni) {
+        if (!/^\d{8}$/.test(payload.dni)) {
+            return "El DNI debe tener 8 dígitos numéricos.";
+        }
+    }
+    if (payload.tipo_documento === "ruc" && payload.dni) {
+        if (!/^\d{11}$/.test(payload.dni)) {
+            return "El RUC debe tener 11 dígitos numéricos.";
+        }
     }
     if (!payload.nombre) {
         return "El nombre del cliente es requerido.";
@@ -1220,7 +1501,7 @@ function validateClientPayload(payload) {
 function validate(payload) {
     let valid = true;
     const required = {
-        "#f-cliente-search": payload.cliente_dni && payload.cliente,
+        "#f-cliente-search": payload.cliente_id && payload.cliente,
         "#f-transportista": payload.transportista_id,
         "#f-cantidad": payload.cantidad,
         "#f-tipo": payload.tipo,
@@ -1276,35 +1557,110 @@ async function loadManagementLists() {
 function renderClientsTable(items) {
     const list = $("#clients-list");
     if (!items.length) {
-        list.innerHTML = `<tr><td class="empty-state" colspan="4">Sin clientes registrados.</td></tr>`;
+        list.innerHTML = `<tr><td class="empty-state" colspan="7">Sin clientes registrados.</td></tr>`;
         return;
     }
 
-    list.innerHTML = items.map((cliente) => `
+    list.innerHTML = items.map((cliente) => {
+        const tipoDisplay = cliente.tipo_documento
+            ? `<span class="badge ${cliente.tipo_documento === "ruc" ? "contra" : "pagado"}">${cliente.tipo_documento.toUpperCase()}</span>`
+            : "-";
+        const docDisplay = cliente.dni
+            ? `<span class="cell-code">${escapeHtml(cliente.dni)}</span>`
+            : "-";
+        const estadoDisplay = `<span class="badge ${cliente.activo ? "pagado" : "contra"}">${cliente.activo ? "Activo" : "Inactivo"}</span>`;
+        const canManage = can("clientes.manage");
+        const canDelete = can("clientes.delete");
+        const actions = [];
+        if (canManage) {
+            actions.push(`<span class="material-icon" data-client-edit="${cliente.id}" title="Editar" role="button" tabindex="0" aria-label="Editar cliente">edit</span>`);
+            actions.push(`<span class="material-icon" data-client-toggle="${cliente.id}" title="${cliente.activo ? "Desactivar" : "Activar"}" role="button" tabindex="0" aria-label="${cliente.activo ? "Desactivar cliente" : "Activar cliente"}">${cliente.activo ? "toggle_off" : "toggle_on"}</span>`);
+        }
+        if (canDelete) {
+            actions.push(`<span class="material-icon delete" data-client-delete="${cliente.id}" title="Eliminar" role="button" tabindex="0" aria-label="Eliminar cliente">delete</span>`);
+        }
+        const actionsHtml = actions.length
+            ? `<div class="row-actions">${actions.join("")}</div>`
+            : "-";
+        return `
         <tr>
-            <td class="cell-code">${escapeHtml(cliente.dni)}</td>
+            <td>${tipoDisplay}</td>
+            <td>${docDisplay}</td>
             <td><strong>${escapeHtml(cliente.nombre)}</strong></td>
             <td class="cell-muted">${escapeHtml(cliente.telefono || "-")}</td>
             <td class="cell-muted">${escapeHtml(cliente.direccion || "-")}</td>
-        </tr>
-    `).join("");
+            <td>${estadoDisplay}</td>
+            <td>${actionsHtml}</td>
+        </tr>`;
+    }).join("");
+
+    list.querySelectorAll("[data-client-edit]").forEach((button) => {
+        button.addEventListener("click", () => editCliente(Number(button.dataset.clientEdit)));
+    });
+    list.querySelectorAll("[data-client-toggle]").forEach((button) => {
+        button.addEventListener("click", () => toggleClienteActive(Number(button.dataset.clientToggle)));
+    });
+    list.querySelectorAll("[data-client-delete]").forEach((button) => {
+        button.addEventListener("click", () => deleteCliente(Number(button.dataset.clientDelete)));
+    });
 }
 
 function renderCarriersTable(items) {
     const list = $("#carriers-list");
     if (!items.length) {
-        list.innerHTML = `<tr><td class="empty-state" colspan="4">Sin transportistas registrados.</td></tr>`;
+        list.innerHTML = `<tr><td class="empty-state" colspan="7">Sin transportistas registrados.</td></tr>`;
         return;
     }
 
-    list.innerHTML = items.map((transportista) => `
+    const tipoLabels = { encomiendas: "Encomiendas", maquinaria: "Maquinaria", camion: "Camión" };
+
+    list.innerHTML = items.map((transportista) => {
+        const tipos = transportista.tipos || [];
+        const tiposDisplay = tipos.length
+            ? tipos.map((t) => `<span class="tipo-badge tipo-badge-${t}">${tipoLabels[t] || t}</span>`).join("")
+            : `<span class="cell-muted">-</span>`;
+        const tipoDocDisplay = transportista.tipo_documento
+            ? `<span class="badge ${transportista.tipo_documento === "ruc" ? "contra" : "pagado"}">${transportista.tipo_documento.toUpperCase()}</span>`
+            : `<span class="cell-muted">-</span>`;
+        const docDisplay = transportista.documento
+            ? `<span class="cell-code">${escapeHtml(transportista.documento)}</span>`
+            : `<span class="cell-muted">-</span>`;
+        const estadoDisplay = `<span class="badge ${transportista.activo ? "pagado" : "contra"}">${transportista.activo ? "Activo" : "Inactivo"}</span>`;
+        const canDelete = can("transportistas.delete");
+        const actions = [];
+        if (canDelete) {
+            actions.push(`<span class="material-icon" data-carrier-details="${transportista.id}" title="Ver detalles" role="button" tabindex="0" aria-label="Ver detalles">info</span>`);
+            actions.push(`<span class="material-icon" data-carrier-edit="${transportista.id}" title="Editar" role="button" tabindex="0" aria-label="Editar transportista">edit</span>`);
+            actions.push(`<span class="material-icon" data-carrier-toggle="${transportista.id}" title="${transportista.activo ? "Desactivar" : "Activar"}" role="button" tabindex="0" aria-label="${transportista.activo ? "Desactivar transportista" : "Activar transportista"}">${transportista.activo ? "toggle_off" : "toggle_on"}</span>`);
+            actions.push(`<span class="material-icon delete" data-carrier-delete="${transportista.id}" title="Eliminar" role="button" tabindex="0" aria-label="Eliminar transportista">delete</span>`);
+        }
+        const actionsHtml = actions.length
+            ? `<div class="row-actions">${actions.join("")}</div>`
+            : "-";
+        return `
         <tr>
             <td><strong>${escapeHtml(transportista.nombre)}</strong></td>
-            <td class="cell-code">${escapeHtml(transportista.documento || "-")}</td>
+            <td>${tipoDocDisplay}</td>
+            <td>${docDisplay}</td>
+            <td>${tiposDisplay}</td>
             <td class="cell-muted">${escapeHtml(transportista.telefono || "-")}</td>
-            <td><span class="badge pagado">${transportista.activo ? "Activo" : "Inactivo"}</span></td>
-        </tr>
-    `).join("");
+            <td>${estadoDisplay}</td>
+            <td>${actionsHtml}</td>
+        </tr>`;
+    }).join("");
+
+    list.querySelectorAll("[data-carrier-details]").forEach((button) => {
+        button.addEventListener("click", () => showCarrierDetails(Number(button.dataset.carrierDetails)));
+    });
+    list.querySelectorAll("[data-carrier-edit]").forEach((button) => {
+        button.addEventListener("click", () => editCarrier(Number(button.dataset.carrierEdit)));
+    });
+    list.querySelectorAll("[data-carrier-toggle]").forEach((button) => {
+        button.addEventListener("click", () => toggleCarrierActive(Number(button.dataset.carrierToggle)));
+    });
+    list.querySelectorAll("[data-carrier-delete]").forEach((button) => {
+        button.addEventListener("click", () => deleteCarrier(Number(button.dataset.carrierDelete)));
+    });
 }
 
 async function loadPackageTypes(activeOnly = false) {
@@ -1341,8 +1697,8 @@ function renderPackageTypesTable() {
             <td><span class="badge ${tipo.activo ? "pagado" : "contra"}">${tipo.activo ? "Activo" : "Inactivo"}</span></td>
             <td>
                 <div class="row-actions">
-                    <button class="button icon-only icon-edit" type="button" data-package-edit="${tipo.id}" title="Editar" aria-label="Editar tipo"></button>
-                    <button class="button button-danger icon-only icon-delete" type="button" data-package-delete="${tipo.id}" title="Eliminar" aria-label="Eliminar tipo"></button>
+                    <span class="material-icon" data-package-edit="${tipo.id}" title="Editar" role="button" tabindex="0" aria-label="Editar tipo">edit</span>
+                    <span class="material-icon delete" data-package-delete="${tipo.id}" title="Eliminar" role="button" tabindex="0" aria-label="Eliminar tipo">delete</span>
                 </div>
             </td>
         </tr>
@@ -1451,7 +1807,7 @@ function renderPendingAmounts() {
                 <td>${escapeHtml(envio.tipo)}</td>
                 <td class="cell-code">${money(costo)}</td>
                 <td>
-                    <button class="button button-primary button-with-icon icon-money" type="button" data-pending-amount="${envio.id}">Liquidar</button>
+                    <button class="button button-primary button-with-icon" type="button" data-pending-amount="${envio.id}"><span class="material-icon">payments</span>Liquidar</button>
                 </td>
             </tr>
         `;
@@ -1538,8 +1894,8 @@ function renderRolesTable() {
             <td>${role.users_count}</td>
             <td>
                 <div class="row-actions">
-                    <button class="button icon-only icon-edit" type="button" data-role-edit="${role.id}" title="Editar" aria-label="Editar rol"></button>
-                    <button class="button button-danger icon-only icon-delete" type="button" data-role-delete="${role.id}" title="Eliminar" aria-label="Eliminar rol"></button>
+                    <span class="material-icon" data-role-edit="${role.id}" title="Editar" role="button" tabindex="0" aria-label="Editar rol">edit</span>
+                    <span class="material-icon delete" data-role-delete="${role.id}" title="Eliminar" role="button" tabindex="0" aria-label="Eliminar rol">delete</span>
                 </div>
             </td>
         </tr>
@@ -1680,8 +2036,8 @@ function renderUsersTable() {
             <td><span class="badge ${user.active ? "pagado" : "contra"}">${user.active ? "Activo" : "Inactivo"}</span></td>
             <td>
                 <div class="row-actions">
-                    <button class="button icon-only icon-edit" type="button" data-user-edit="${user.id}" title="Editar" aria-label="Editar usuario"></button>
-                    <button class="button button-danger icon-only icon-delete" type="button" data-user-delete="${user.id}" title="Eliminar" aria-label="Eliminar usuario"></button>
+                    <span class="material-icon" data-user-edit="${user.id}" title="Editar" role="button" tabindex="0" aria-label="Editar usuario">edit</span>
+                    <span class="material-icon delete" data-user-delete="${user.id}" title="Eliminar" role="button" tabindex="0" aria-label="Eliminar usuario">delete</span>
                 </div>
             </td>
         </tr>

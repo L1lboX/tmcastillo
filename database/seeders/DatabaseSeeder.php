@@ -29,8 +29,10 @@ class DatabaseSeeder extends Seeder
             'envios.export' => 'Exportar envios',
             'envios.amounts' => 'Registrar montos',
             'clientes.manage' => 'Gestionar clientes',
+            'clientes.delete' => 'Eliminar clientes',
             'clientes.debt' => 'Ver cuentas por cobrar',
             'transportistas.manage' => 'Gestionar transportistas',
+            'transportistas.delete' => 'Eliminar transportistas',
             'tipos_paquete.manage' => 'Gestionar tipos de paquete',
             'dashboard.view' => 'Ver dashboard',
             'users.manage' => 'Gestionar usuarios',
@@ -57,7 +59,7 @@ class DatabaseSeeder extends Seeder
             ],
             'administrador' => [
                 'label' => 'Administrador',
-                'permissions' => ['envios.view', 'envios.create', 'envios.update', 'envios.delete', 'envios.export', 'envios.amounts', 'clientes.manage', 'clientes.debt', 'transportistas.manage', 'tipos_paquete.manage', 'dashboard.view', 'users.manage', 'roles.manage'],
+                'permissions' => ['envios.view', 'envios.create', 'envios.update', 'envios.delete', 'envios.export', 'envios.amounts', 'clientes.manage', 'clientes.delete', 'clientes.debt', 'transportistas.manage', 'transportistas.delete', 'tipos_paquete.manage', 'dashboard.view', 'users.manage', 'roles.manage'],
             ],
             'super_admin' => [
                 'label' => 'Super admin',
@@ -106,6 +108,7 @@ class DatabaseSeeder extends Seeder
         Cliente::query()->updateOrCreate([
             'dni' => '12345678',
         ], [
+            'tipo_documento' => 'dni',
             'nombre' => 'Cliente Demo',
             'telefono' => '987654321',
             'direccion' => 'Lima',

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Transportes Castillo - Sistema de Envíos</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
@@ -36,33 +37,70 @@
             </div>
 
             <nav class="sidebar-nav" id="sidebar-nav" aria-label="Módulos">
-                @can('envios.view')
-                    <button class="sidebar-link active" type="button" data-section="envios">Envíos</button>
-                @endcan
-                @can('clientes.manage')
-                    <button class="sidebar-link" type="button" data-section="clientes">Clientes</button>
-                @endcan
-                @can('transportistas.manage')
-                    <button class="sidebar-link" type="button" data-section="transportistas">Transportistas</button>
-                @endcan
-                @can('tipos_paquete.manage')
-                    <button class="sidebar-link" type="button" data-section="tipos">Tipos de paquete</button>
-                @endcan
-                @can('envios.amounts')
-                    <button class="sidebar-link" type="button" data-section="montos">Montos</button>
-                @endcan
-                @can('clientes.debt')
-                    <button class="sidebar-link" type="button" data-section="cuentas">Cuentas por cobrar</button>
-                @endcan
                 @can('dashboard.view')
-                    <button class="sidebar-link" type="button" data-section="dashboard">Dashboard</button>
+                    <div class="sidebar-group" data-group="admin">
+                        <button class="sidebar-group-label" type="button" data-toggle-group="admin">
+                            <span>Administración</span>
+                            <span class="material-icon sidebar-group-arrow">expand_more</span>
+                        </button>
+                        <button class="sidebar-link" type="button" data-section="dashboard">Dashboard</button>
+                        @can('roles.manage')
+                            <button class="sidebar-link" type="button" data-section="roles">Roles</button>
+                        @endcan
+                        @can('users.manage')
+                            <button class="sidebar-link" type="button" data-section="usuarios">Usuarios</button>
+                        @endcan
+                    </div>
                 @endcan
-                @can('roles.manage')
-                    <button class="sidebar-link" type="button" data-section="roles">Roles</button>
+
+                <div class="sidebar-group" data-group="encomiendas">
+                    <button class="sidebar-group-label" type="button" data-toggle-group="encomiendas">
+                        <span>Encomiendas</span>
+                        <span class="material-icon sidebar-group-arrow">expand_more</span>
+                    </button>
+                    @can('envios.view')
+                        <button class="sidebar-link{{ auth()->user()->cannot('dashboard.view') ? ' active' : '' }}" type="button" data-section="envios">Envíos</button>
+                    @endcan
+                    @can('tipos_paquete.manage')
+                        <button class="sidebar-link" type="button" data-section="tipos">Tipos de paquete</button>
+                    @endcan
+                </div>
+
+                @can('envios.amounts')
+                    <div class="sidebar-group" data-group="finanzas">
+                        <button class="sidebar-group-label" type="button" data-toggle-group="finanzas">
+                            <span>Finanzas</span>
+                            <span class="material-icon sidebar-group-arrow">expand_more</span>
+                        </button>
+                        <button class="sidebar-link" type="button" data-section="montos">Montos</button>
+                        @can('clientes.debt')
+                            <button class="sidebar-link" type="button" data-section="cuentas">Cuentas por cobrar</button>
+                        @endcan
+                    </div>
+                @elseif(auth()->user()->can('clientes.debt'))
+                    <div class="sidebar-group" data-group="finanzas">
+                        <button class="sidebar-group-label" type="button" data-toggle-group="finanzas">
+                            <span>Finanzas</span>
+                            <span class="material-icon sidebar-group-arrow">expand_more</span>
+                        </button>
+                        @can('clientes.debt')
+                            <button class="sidebar-link" type="button" data-section="cuentas">Cuentas por cobrar</button>
+                        @endcan
+                    </div>
                 @endcan
-                @can('users.manage')
-                    <button class="sidebar-link" type="button" data-section="usuarios">Usuarios</button>
-                @endcan
+
+                <div class="sidebar-group" data-group="registros">
+                    <button class="sidebar-group-label" type="button" data-toggle-group="registros">
+                        <span>Registros</span>
+                        <span class="material-icon sidebar-group-arrow">expand_more</span>
+                    </button>
+                    @can('clientes.manage')
+                        <button class="sidebar-link" type="button" data-section="clientes">Clientes</button>
+                    @endcan
+                    @can('transportistas.manage')
+                        <button class="sidebar-link" type="button" data-section="transportistas">Transportistas</button>
+                    @endcan
+                </div>
             </nav>
 
             <div class="sidebar-footer">
@@ -81,8 +119,13 @@
         <div class="app-main">
             <header class="topbar">
                 <div>
-                    <strong id="section-title">Envíos</strong>
-                    <span id="section-subtitle">Registro y control de carga</span>
+                    @can('dashboard.view')
+                        <strong id="section-title">Dashboard</strong>
+                        <span id="section-subtitle">Indicadores y control operativo</span>
+                    @else
+                        <strong id="section-title">Envíos</strong>
+                        <span id="section-subtitle">Registro y control de carga</span>
+                    @endcan
                 </div>
                 <button class="sidebar-toggle" id="topbar-toggle" type="button" aria-expanded="false" aria-label="Abrir menú">
                     <span></span>
@@ -114,7 +157,7 @@
             </header>
 
             <main class="workspace">
-                <section class="module-page" data-page="envios">
+                <section class="module-page{{ auth()->user()->can('dashboard.view') ? ' hidden' : '' }}" data-page="envios">
                     <section class="page-head page-head-compact">
                         <div class="head-actions">
                             @can('envios.export')
@@ -129,10 +172,13 @@
                     <section class="table-shell">
                         <div class="table-tools table-tools-bar">
                             <div class="tool-group">
-                                <label>
+                                <label class="search-field">
                                     <span>Buscar</span>
-                                    <input id="search-input" type="search" placeholder="Cliente, DNI, guía o tipo">
+                                    <input id="search-input" type="search" placeholder="Cliente, documento, guía o tipo">
                                 </label>
+                                <button class="button button-with-icon icon-filter" id="btn-toggle-filters" type="button" aria-expanded="false">Filtros</button>
+                            </div>
+                            <div class="tool-group filter-panel" id="filter-panel">
                                 <label>
                                     <span>Desde</span>
                                     <input id="filter-fecha-desde" type="date">
@@ -198,10 +244,13 @@
                             <table>
                                 <thead>
                                     <tr>
-                                        <th>DNI</th>
+                                        <th>Tipo</th>
+                                        <th>Documento</th>
                                         <th>Cliente</th>
                                         <th>Telefono</th>
                                         <th>Direccion</th>
+                                        <th>Estado</th>
+                                        <th>Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody id="clients-list"></tbody>
@@ -227,9 +276,12 @@
                                 <thead>
                                     <tr>
                                         <th>Nombre</th>
+                                        <th>Tipo</th>
                                         <th>Documento</th>
+                                        <th>Especialidad</th>
                                         <th>Telefono</th>
                                         <th>Estado</th>
+                                        <th>Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody id="carriers-list"></tbody>
@@ -317,29 +369,29 @@
                         <div class="table-tools">
                             <label class="search-field">
                                 <span>Buscar cliente</span>
-                                <input id="debt-client-search" type="search" placeholder="Nombre o DNI">
+                                <input id="debt-client-search" type="search" placeholder="Nombre o documento">
                             </label>
                             <button class="button button-primary button-with-icon icon-add" id="btn-open-abono-modal" type="button">Registrar abono</button>
                         </div>
                         <div class="table-scroll">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>DNI</th>
-                                        <th>Cliente</th>
-                                        <th>Telefono</th>
-                                        <th>Saldo pendiente</th>
-                                        <th>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="debt-clients-list"></tbody>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Documento</th>
+                                    <th>Cliente</th>
+                                    <th>Telefono</th>
+                                    <th>Saldo pendiente</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="debt-clients-list"></tbody>
                             </table>
                         </div>
                     </section>
 
                 </section>
 
-                <section class="module-page hidden" data-page="dashboard">
+                <section class="module-page{{ auth()->user()->cannot('dashboard.view') ? ' hidden' : '' }}" data-page="dashboard">
                     <section class="placeholder-module">
                         <h1>Dashboard</h1>
                         <p>Módulo reservado para indicadores, ganancias y análisis por rol.</p>
@@ -425,6 +477,16 @@
         </section>
     </div>
 
+    <div class="modal-backdrop" id="carrier-details-modal" aria-hidden="true">
+        <section class="modal modal-small" role="dialog" aria-modal="true" aria-labelledby="carrier-details-title">
+            <header class="modal-head">
+                <h2 id="carrier-details-title">Detalle del transportista</h2>
+                <button class="button button-with-icon icon-close" id="btn-close-carrier-details-modal" type="button">Cerrar</button>
+            </header>
+            <div class="modal-body details-body" id="carrier-details-body"></div>
+        </section>
+    </div>
+
     <div class="modal-backdrop" id="client-modal" aria-hidden="true">
         <section class="modal modal-small" role="dialog" aria-modal="true" aria-labelledby="client-modal-title">
             <header class="modal-head">
@@ -435,8 +497,16 @@
             <form id="client-admin-form" class="modal-body">
                 <div class="form-grid two">
                     <label>
-                        <span>DNI</span>
-                        <input id="client-admin-dni" type="text" inputmode="numeric" maxlength="8" placeholder="DNI">
+                        <span>Tipo documento</span>
+                        <select id="client-admin-tipo-documento">
+                            <option value="">Ninguno</option>
+                            <option value="dni">DNI</option>
+                            <option value="ruc">RUC</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span>DNI / RUC</span>
+                        <input id="client-admin-dni" type="text" inputmode="numeric" maxlength="11" placeholder="Número de documento">
                     </label>
                     <label>
                         <span>Nombre</span>
@@ -473,13 +543,38 @@
                         <input id="carrier-admin-name" type="text" placeholder="Nombre completo">
                     </label>
                     <label>
+                        <span>Tipo documento</span>
+                        <select id="carrier-admin-tipo-documento">
+                            <option value="">Ninguno</option>
+                            <option value="dni">DNI</option>
+                            <option value="ruc">RUC</option>
+                        </select>
+                    </label>
+                    <label>
                         <span>Documento</span>
                         <input id="carrier-admin-document" type="text" maxlength="20" placeholder="DNI o codigo">
                     </label>
-                    <label class="span-2">
+                    <label>
                         <span>Telefono</span>
                         <input id="carrier-admin-phone" type="text" maxlength="20" placeholder="987654321">
                     </label>
+                </div>
+                <div class="carrier-tipos-section">
+                    <span class="carrier-tipos-label">Especialidad</span>
+                    <div class="carrier-tipos-grid">
+                        <label class="check-row">
+                            <input type="checkbox" name="carrier-tipo" value="encomiendas">
+                            <span class="mini-label">Encomiendas</span>
+                        </label>
+                        <label class="check-row">
+                            <input type="checkbox" name="carrier-tipo" value="maquinaria">
+                            <span class="mini-label">Maquinaria</span>
+                        </label>
+                        <label class="check-row">
+                            <input type="checkbox" name="carrier-tipo" value="camion">
+                            <span class="mini-label">Camión</span>
+                        </label>
+                    </div>
                 </div>
                 <footer class="modal-actions">
                     <button class="button button-with-icon icon-cancel" id="btn-cancel-carrier-modal" type="button">Cancelar</button>
@@ -515,6 +610,7 @@
 
                 <div class="form-section">
                     <h3>02 Cliente</h3>
+                    <input type="hidden" id="f-cliente-id">
                     <input type="hidden" id="f-dni">
                     <input type="hidden" id="f-nombre">
                     <input type="hidden" id="f-telefono">
@@ -535,15 +631,23 @@
                     <div class="client-inline-form hidden" id="client-inline-form">
                         <div class="form-grid four">
                             <label>
-                                <span>DNI</span>
-                                <input type="text" id="client-inline-dni" inputmode="numeric" maxlength="8" placeholder="DNI">
+                                <span>Tipo documento</span>
+                                <select id="client-inline-tipo-documento">
+                                    <option value="">Ninguno</option>
+                                    <option value="dni">DNI</option>
+                                    <option value="ruc">RUC</option>
+                                </select>
                             </label>
                             <label class="span-3">
+                                <span>DNI / RUC</span>
+                                <input type="text" id="client-inline-dni" inputmode="numeric" maxlength="11" placeholder="Número de documento">
+                            </label>
+                            <label class="span-2">
                                 <span>Nombre completo</span>
                                 <input type="text" id="client-inline-name" placeholder="Nombre del cliente">
                             </label>
                             <label class="span-2">
-                            <span>Telefono</span>
+                                <span>Telefono</span>
                                 <input type="text" id="client-inline-phone" inputmode="numeric" maxlength="9" placeholder="987654321">
                             </label>
                             <label class="span-2">
@@ -806,7 +910,7 @@
                     <div class="form-grid two">
                         <label class="span-2">
                             <span>Cliente</span>
-                            <input id="abono-cliente-dni" type="hidden">
+                            <input id="abono-cliente-id" type="hidden">
                             <input id="abono-cliente-nombre" type="text" readonly placeholder="Cliente seleccionado">
                         </label>
                         <label>

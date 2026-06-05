@@ -14,12 +14,12 @@ class CuentaCorrienteController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $clienteDni = trim((string) $request->query('cliente_dni', ''));
+        $clienteId = trim((string) $request->query('cliente_id', ''));
         $tipo = trim((string) $request->query('tipo', ''));
 
         $query = CuentaCorriente::query()
             ->with(['cliente', 'envio'])
-            ->when($clienteDni !== '', fn ($q) => $q->where('cliente_dni', $clienteDni))
+            ->when($clienteId !== '', fn ($q) => $q->where('cliente_id', (int) $clienteId))
             ->when($tipo !== '', fn ($q) => $q->where('tipo', $tipo))
             ->latest('id');
 
@@ -31,39 +31,34 @@ class CuentaCorrienteController extends Controller
         ]);
     }
 
-    public function saldoCliente(string $dni): JsonResponse
+    public function saldoCliente(Cliente $cliente): JsonResponse
     {
-        $cliente = Cliente::query()->where('dni', $dni)->first();
-
-        if (! $cliente) {
-            return response()->json(['ok' => false, 'message' => 'Cliente no encontrado'], 404);
-        }
-
         $cargos = CuentaCorriente::query()
-            ->where('cliente_dni', $dni)
+            ->where('cliente_id', $cliente->id)
             ->where('tipo', 'cargo')
             ->sum('monto');
 
         $abonos = CuentaCorriente::query()
-            ->where('cliente_dni', $dni)
+            ->where('cliente_id', $cliente->id)
             ->where('tipo', 'abono')
             ->sum('monto');
 
         $enviosConDeuda = Envio::query()
-            ->where('cliente_dni', $dni)
+            ->where('cliente_id', $cliente->id)
             ->where('pago', 'Credito')
             ->whereNotNull('monto')
             ->sum('monto');
 
         $ultimoSaldo = CuentaCorriente::query()
-            ->where('cliente_dni', $dni)
+            ->where('cliente_id', $cliente->id)
             ->latest('id')
             ->value('saldo_acumulado');
 
         return response()->json([
             'ok' => true,
             'data' => [
-                'cliente_dni' => $dni,
+                'cliente_id' => $cliente->id,
+                'cliente_dni' => $cliente->dni,
                 'cliente_nombre' => $cliente->nombre,
                 'total_cargos' => round((float) $cargos, 2),
                 'total_abonos' => round((float) $abonos, 2),
@@ -77,21 +72,21 @@ class CuentaCorrienteController extends Controller
     public function clientesConDeuda(): JsonResponse
     {
         $clientes = Cliente::query()
-            ->select('dni', 'nombre', 'telefono')
+            ->select('id', 'dni', 'nombre', 'telefono')
             ->get()
             ->map(function (Cliente $cliente): array {
                 $cargos = CuentaCorriente::query()
-                    ->where('cliente_dni', $cliente->dni)
+                    ->where('cliente_id', $cliente->id)
                     ->where('tipo', 'cargo')
                     ->sum('monto');
 
                 $abonos = CuentaCorriente::query()
-                    ->where('cliente_dni', $cliente->dni)
+                    ->where('cliente_id', $cliente->id)
                     ->where('tipo', 'abono')
                     ->sum('monto');
 
                 $enviosCredito = Envio::query()
-                    ->where('cliente_dni', $cliente->dni)
+                    ->where('cliente_id', $cliente->id)
                     ->where('pago', 'Credito')
                     ->whereNotNull('monto')
                     ->sum('monto');
@@ -99,6 +94,7 @@ class CuentaCorrienteController extends Controller
                 $saldo = round(((float) $cargos + (float) $enviosCredito - (float) $abonos), 2);
 
                 return [
+                    'id' => $cliente->id,
                     'dni' => $cliente->dni,
                     'nombre' => $cliente->nombre,
                     'telefono' => $cliente->telefono,
@@ -119,23 +115,24 @@ class CuentaCorrienteController extends Controller
     public function registrarAbono(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'cliente_dni' => ['required', 'string', 'exists:clientes,dni'],
+            'cliente_id' => ['required', 'integer', 'exists:clientes,id'],
             'monto' => ['required', 'numeric', 'min:0.01', 'max:99999999.99'],
             'fecha' => ['required', 'date'],
             'observacion' => ['nullable', 'string', 'max:255'],
         ]);
 
         $abono = DB::transaction(function () use ($validated): CuentaCorriente {
+            $clienteId = (int) $validated['cliente_id'];
             $ultimoSaldo = CuentaCorriente::query()
-                ->where('cliente_dni', $validated['cliente_dni'])
+                ->where('cliente_id', $clienteId)
                 ->latest('id')
                 ->value('saldo_acumulado');
 
-            $saldoActual = $ultimoSaldo !== null ? (float) $ultimoSaldo : $this->calcularSaldoCliente($validated['cliente_dni']);
+            $saldoActual = $ultimoSaldo !== null ? (float) $ultimoSaldo : $this->calcularSaldoCliente($clienteId);
             $nuevoSaldo = round($saldoActual - (float) $validated['monto'], 2);
 
             return CuentaCorriente::create([
-                'cliente_dni' => $validated['cliente_dni'],
+                'cliente_id' => $clienteId,
                 'tipo' => 'abono',
                 'monto' => round((float) $validated['monto'], 2),
                 'saldo_acumulado' => $nuevoSaldo,
@@ -174,15 +171,15 @@ class CuentaCorrienteController extends Controller
 
         $cargo = DB::transaction(function () use ($envio): CuentaCorriente {
             $ultimoSaldo = CuentaCorriente::query()
-                ->where('cliente_dni', $envio->cliente_dni)
+                ->where('cliente_id', $envio->cliente_id)
                 ->latest('id')
                 ->value('saldo_acumulado');
 
-            $saldoActual = $ultimoSaldo !== null ? (float) $ultimoSaldo : $this->calcularSaldoCliente($envio->cliente_dni);
+            $saldoActual = $ultimoSaldo !== null ? (float) $ultimoSaldo : $this->calcularSaldoCliente($envio->cliente_id);
             $nuevoSaldo = round($saldoActual + (float) $envio->monto, 2);
 
             return CuentaCorriente::create([
-                'cliente_dni' => $envio->cliente_dni,
+                'cliente_id' => $envio->cliente_id,
                 'envio_id' => $envio->id,
                 'tipo' => 'cargo',
                 'monto' => (float) $envio->monto,
@@ -198,20 +195,20 @@ class CuentaCorrienteController extends Controller
         ], 201);
     }
 
-    private function calcularSaldoCliente(string $dni): float
+    private function calcularSaldoCliente(int $clienteId): float
     {
         $cargos = CuentaCorriente::query()
-            ->where('cliente_dni', $dni)
+            ->where('cliente_id', $clienteId)
             ->where('tipo', 'cargo')
             ->sum('monto');
 
         $abonos = CuentaCorriente::query()
-            ->where('cliente_dni', $dni)
+            ->where('cliente_id', $clienteId)
             ->where('tipo', 'abono')
             ->sum('monto');
 
         $enviosCredito = Envio::query()
-            ->where('cliente_dni', $dni)
+            ->where('cliente_id', $clienteId)
             ->where('pago', 'Credito')
             ->whereNotNull('monto')
             ->sum('monto');
@@ -223,7 +220,8 @@ class CuentaCorrienteController extends Controller
     {
         return [
             'id' => $cc->id,
-            'cliente_dni' => $cc->cliente_dni,
+            'cliente_id' => $cc->cliente_id,
+            'cliente_dni' => $cc->cliente?->dni,
             'cliente_nombre' => $cc->cliente?->nombre,
             'envio_id' => $cc->envio_id,
             'envio_codigo' => $cc->envio?->codigo,
