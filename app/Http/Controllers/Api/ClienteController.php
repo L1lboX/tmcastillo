@@ -19,8 +19,8 @@ class ClienteController extends Controller
                 $query->where('dni', 'like', "%{$term}%")
                     ->orWhere('nombre', 'like', "%{$term}%");
             })
-            ->orderBy('nombre')
-            ->limit($term === '' ? 50 : 20)
+            ->orderBy($term === '' ? 'created_at' : 'nombre', $term === '' ? 'desc' : 'asc')
+            ->limit($term === '' ? 10 : 20)
             ->get();
 
         return response()->json(['ok' => true, 'data' => $clientes]);
@@ -35,10 +35,18 @@ class ClienteController extends Controller
     {
         $payload = $this->validatedPayload($request);
 
-        if ($payload['dni'] !== null && Cliente::query()->where('dni', $payload['dni'])->exists()) {
-            throw ValidationException::withMessages([
-                'dni' => 'Ya existe un cliente con ese documento.',
-            ]);
+        if ($payload['dni'] !== null) {
+            if (Cliente::query()->where('dni', $payload['dni'])->exists()) {
+                throw ValidationException::withMessages([
+                    'dni' => 'Ya existe un cliente con ese documento.',
+                ]);
+            }
+        } else {
+            if (Cliente::query()->where('nombre', $payload['nombre'])->whereNull('dni')->exists()) {
+                throw ValidationException::withMessages([
+                    'nombre' => 'Ya existe un cliente con ese nombre.',
+                ]);
+            }
         }
 
         return response()->json([
@@ -51,10 +59,18 @@ class ClienteController extends Controller
     {
         $payload = $this->validatedPayload($request, $cliente->id);
 
-        if ($payload['dni'] !== null && Cliente::query()->where('dni', $payload['dni'])->where('id', '!=', $cliente->id)->exists()) {
-            throw ValidationException::withMessages([
-                'dni' => 'Ya existe otro cliente con ese documento.',
-            ]);
+        if ($payload['dni'] !== null) {
+            if (Cliente::query()->where('dni', $payload['dni'])->where('id', '!=', $cliente->id)->exists()) {
+                throw ValidationException::withMessages([
+                    'dni' => 'Ya existe otro cliente con ese documento.',
+                ]);
+            }
+        } else {
+            if (Cliente::query()->where('nombre', $payload['nombre'])->whereNull('dni')->where('id', '!=', $cliente->id)->exists()) {
+                throw ValidationException::withMessages([
+                    'nombre' => 'Ya existe otro cliente con ese nombre.',
+                ]);
+            }
         }
 
         $cliente->update($payload);

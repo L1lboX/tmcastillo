@@ -22,8 +22,8 @@ class TransportistaController extends Controller
                 $query->where('nombre', 'like', "%{$term}%")
                     ->orWhere('documento', 'like', "%{$term}%");
             })
-            ->orderBy('nombre')
-            ->limit($term === '' ? 50 : 20)
+            ->orderBy($term === '' ? 'created_at' : 'nombre', $term === '' ? 'desc' : 'asc')
+            ->limit($term === '' ? 10 : 20)
             ->get();
 
         return response()->json(['ok' => true, 'data' => $transportistas]);

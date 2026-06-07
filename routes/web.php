@@ -101,11 +101,11 @@ Route::middleware('auth')->prefix('api')->group(function (): void {
     Route::post('/transportistas', [TransportistaController::class, 'store'])
         ->middleware('permission:transportistas.manage');
     Route::put('/transportistas/{transportista}', [TransportistaController::class, 'update'])
-        ->middleware('permission:transportistas.delete');
+        ->middleware('permission:transportistas.manage');
     Route::delete('/transportistas/{transportista}', [TransportistaController::class, 'destroy'])
         ->middleware('permission:transportistas.delete');
     Route::patch('/transportistas/{transportista}/toggle', [TransportistaController::class, 'toggleActive'])
-        ->middleware('permission:transportistas.delete');
+        ->middleware('permission:transportistas.manage');
 
     Route::get('/tipos-paquete', [TipoPaqueteController::class, 'index'])
         ->middleware('permission:envios.create');

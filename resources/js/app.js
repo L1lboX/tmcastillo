@@ -1100,15 +1100,13 @@ async function searchClient() {
     const search = input.value.trim();
 
     if (!search) {
-        dropdown.classList.remove("open");
         hideClientNotFound();
         hideClientForm();
-        clearSelectedClient();
+        clearSelectedClient(false);
         $("#dni-status").textContent = "";
-        return;
     }
 
-    if (search !== $("#f-nombre").value.trim() && search !== $("#f-dni").value.trim()) {
+    if (search && search !== $("#f-nombre").value.trim() && search !== $("#f-dni").value.trim()) {
         clearSelectedClient(false);
     }
 
@@ -1626,12 +1624,15 @@ function renderCarriersTable(items) {
             ? `<span class="cell-code">${escapeHtml(transportista.documento)}</span>`
             : `<span class="cell-muted">-</span>`;
         const estadoDisplay = `<span class="badge ${transportista.activo ? "pagado" : "contra"}">${transportista.activo ? "Activo" : "Inactivo"}</span>`;
+        const canManage = can("transportistas.manage");
         const canDelete = can("transportistas.delete");
         const actions = [];
-        if (canDelete) {
+        if (canManage) {
             actions.push(`<span class="material-icon" data-carrier-details="${transportista.id}" title="Ver detalles" role="button" tabindex="0" aria-label="Ver detalles">info</span>`);
             actions.push(`<span class="material-icon" data-carrier-edit="${transportista.id}" title="Editar" role="button" tabindex="0" aria-label="Editar transportista">edit</span>`);
             actions.push(`<span class="material-icon" data-carrier-toggle="${transportista.id}" title="${transportista.activo ? "Desactivar" : "Activar"}" role="button" tabindex="0" aria-label="${transportista.activo ? "Desactivar transportista" : "Activar transportista"}">${transportista.activo ? "toggle_off" : "toggle_on"}</span>`);
+        }
+        if (canDelete) {
             actions.push(`<span class="material-icon delete" data-carrier-delete="${transportista.id}" title="Eliminar" role="button" tabindex="0" aria-label="Eliminar transportista">delete</span>`);
         }
         const actionsHtml = actions.length
