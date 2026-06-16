@@ -43,16 +43,7 @@ class CuentaCorrienteController extends Controller
             ->where('tipo', 'abono')
             ->sum('monto');
 
-        $enviosConDeuda = Envio::query()
-            ->where('cliente_id', $cliente->id)
-            ->where('pago', 'Credito')
-            ->whereNotNull('monto')
-            ->sum('monto');
-
-        $ultimoSaldo = CuentaCorriente::query()
-            ->where('cliente_id', $cliente->id)
-            ->latest('id')
-            ->value('saldo_acumulado');
+        $saldoPendiente = round(((float) $cargos - (float) $abonos), 2);
 
         return response()->json([
             'ok' => true,
@@ -62,9 +53,7 @@ class CuentaCorrienteController extends Controller
                 'cliente_nombre' => $cliente->nombre,
                 'total_cargos' => round((float) $cargos, 2),
                 'total_abonos' => round((float) $abonos, 2),
-                'saldo_pendiente' => round(((float) $cargos - (float) $abonos), 2),
-                'envios_credito' => round((float) $enviosConDeuda, 2),
-                'ultimo_saldo_registrado' => $ultimoSaldo ? round((float) $ultimoSaldo, 2) : 0,
+                'saldo_pendiente' => $saldoPendiente,
             ],
         ]);
     }
@@ -85,13 +74,7 @@ class CuentaCorrienteController extends Controller
                     ->where('tipo', 'abono')
                     ->sum('monto');
 
-                $enviosCredito = Envio::query()
-                    ->where('cliente_id', $cliente->id)
-                    ->where('pago', 'Credito')
-                    ->whereNotNull('monto')
-                    ->sum('monto');
-
-                $saldo = round(((float) $cargos + (float) $enviosCredito - (float) $abonos), 2);
+                $saldo = round(((float) $cargos - (float) $abonos), 2);
 
                 return [
                     'id' => $cliente->id,
@@ -123,12 +106,7 @@ class CuentaCorrienteController extends Controller
 
         $abono = DB::transaction(function () use ($validated): CuentaCorriente {
             $clienteId = (int) $validated['cliente_id'];
-            $ultimoSaldo = CuentaCorriente::query()
-                ->where('cliente_id', $clienteId)
-                ->latest('id')
-                ->value('saldo_acumulado');
-
-            $saldoActual = $ultimoSaldo !== null ? (float) $ultimoSaldo : $this->calcularSaldoCliente($clienteId);
+            $saldoActual = $this->calcularSaldoCliente($clienteId);
             $nuevoSaldo = round($saldoActual - (float) $validated['monto'], 2);
 
             return CuentaCorriente::create([
@@ -170,12 +148,7 @@ class CuentaCorrienteController extends Controller
         }
 
         $cargo = DB::transaction(function () use ($envio): CuentaCorriente {
-            $ultimoSaldo = CuentaCorriente::query()
-                ->where('cliente_id', $envio->cliente_id)
-                ->latest('id')
-                ->value('saldo_acumulado');
-
-            $saldoActual = $ultimoSaldo !== null ? (float) $ultimoSaldo : $this->calcularSaldoCliente($envio->cliente_id);
+            $saldoActual = $this->calcularSaldoCliente($envio->cliente_id);
             $nuevoSaldo = round($saldoActual + (float) $envio->monto, 2);
 
             return CuentaCorriente::create([
@@ -207,13 +180,7 @@ class CuentaCorrienteController extends Controller
             ->where('tipo', 'abono')
             ->sum('monto');
 
-        $enviosCredito = Envio::query()
-            ->where('cliente_id', $clienteId)
-            ->where('pago', 'Credito')
-            ->whereNotNull('monto')
-            ->sum('monto');
-
-        return round(((float) $cargos + (float) $enviosCredito - (float) $abonos), 2);
+        return round(((float) $cargos - (float) $abonos), 2);
     }
 
     private function format(CuentaCorriente $cc): array

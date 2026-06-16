@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Envio;
 use App\Models\Transportista;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -85,6 +86,17 @@ class TransportistaController extends Controller
 
     public function destroy(Transportista $transportista): JsonResponse
     {
+        $pendientes = $transportista->envios()
+            ->where('costo_transportista', '>', 0)
+            ->whereNull('liquidado_at')
+            ->count();
+
+        if ($pendientes > 0) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'transportista' => "No se puede eliminar. El transportista tiene {$pendientes} envío(s) pendiente(s) de liquidar.",
+            ]);
+        }
+
         $transportista->delete();
 
         return response()->json(['ok' => true]);
@@ -97,6 +109,70 @@ class TransportistaController extends Controller
         return response()->json([
             'ok' => true,
             'data' => $transportista->fresh(),
+        ]);
+    }
+
+    public function metrics(): JsonResponse
+    {
+        $transportistas = Transportista::query()
+            ->get()
+            ->map(function (Transportista $t) {
+                $enviosTotal = Envio::query()
+                    ->where('transportista_id', $t->id)
+                    ->count();
+
+                $deudaPendiente = Envio::query()
+                    ->where('transportista_id', $t->id)
+                    ->whereNotNull('liquidado_at')
+                    ->whereNull('pagado_transportista_at')
+                    ->sum('costo_transportista');
+
+                $liquidados = Envio::query()
+                    ->where('transportista_id', $t->id)
+                    ->whereNotNull('pagado_transportista_at')
+                    ->count();
+
+                return [
+                    'id' => $t->id,
+                    'envios_total' => $enviosTotal,
+                    'deuda_pendiente' => round((float) $deudaPendiente, 2),
+                    'liquidados' => $liquidados,
+                ];
+            });
+
+        return response()->json([
+            'ok' => true,
+            'data' => $transportistas->keyBy('id'),
+        ]);
+    }
+
+    public function envios(Transportista $transportista): JsonResponse
+    {
+        $envios = Envio::query()
+            ->with(['cliente', 'items'])
+            ->where('transportista_id', $transportista->id)
+            ->latest('id')
+            ->get()
+            ->map(fn (Envio $envio) => [
+                'id' => $envio->id,
+                'codigo' => $envio->codigo,
+                'fecha' => $envio->fecha?->format('Y-m-d'),
+                'cliente' => $envio->cliente?->nombre,
+                'items' => $envio->items->map(fn ($item) => [
+                    'id' => $item->id,
+                    'cantidad' => $item->cantidad,
+                    'descripcion' => $item->descripcion,
+                    'monto' => $item->monto,
+                ])->values(),
+                'costo_transportista' => $envio->costo_transportista,
+                'estado' => $envio->estado ?? 'Registrado',
+                'liquidado_at' => $envio->liquidado_at?->format('Y-m-d H:i:s'),
+                'pagado_transportista_at' => $envio->pagado_transportista_at?->format('Y-m-d H:i:s'),
+            ]);
+
+        return response()->json([
+            'ok' => true,
+            'data' => $envios,
         ]);
     }
 }

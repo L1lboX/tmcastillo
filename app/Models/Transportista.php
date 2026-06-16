@@ -21,4 +21,9 @@ class Transportista extends Model
     {
         return $this->hasMany(Envio::class);
     }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(EnvioItem::class);
+    }
 }

@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\Cliente;
 use App\Models\Permission;
 use App\Models\Role;
-use App\Models\TipoPaquete;
 use App\Models\Transportista;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -33,7 +32,6 @@ class DatabaseSeeder extends Seeder
             'clientes.debt' => 'Ver cuentas por cobrar',
             'transportistas.manage' => 'Gestionar transportistas',
             'transportistas.delete' => 'Eliminar transportistas',
-            'tipos_paquete.manage' => 'Gestionar tipos de paquete',
             'dashboard.view' => 'Ver dashboard',
             'users.manage' => 'Gestionar usuarios',
             'roles.manage' => 'Gestionar roles y permisos',
@@ -59,7 +57,7 @@ class DatabaseSeeder extends Seeder
             ],
             'administrador' => [
                 'label' => 'Administrador',
-                'permissions' => ['envios.view', 'envios.create', 'envios.update', 'envios.delete', 'envios.export', 'envios.amounts', 'clientes.manage', 'clientes.delete', 'clientes.debt', 'transportistas.manage', 'transportistas.delete', 'tipos_paquete.manage', 'dashboard.view', 'users.manage', 'roles.manage'],
+                'permissions' => ['envios.view', 'envios.create', 'envios.update', 'envios.delete', 'envios.export', 'envios.amounts', 'clientes.manage', 'clientes.delete', 'clientes.debt', 'transportistas.manage', 'transportistas.delete', 'dashboard.view', 'users.manage', 'roles.manage'],
             ],
             'super_admin' => [
                 'label' => 'Super admin',
@@ -85,25 +83,6 @@ class DatabaseSeeder extends Seeder
             'active' => true,
         ]);
         $admin->roles()->syncWithoutDetaching([$roleModels['super_admin']->id]);
-
-        collect([
-            ['nombre' => 'Caja', 'precio_transportista' => 5],
-            ['nombre' => 'Quintal', 'precio_transportista' => 8],
-            ['nombre' => 'Saco', 'precio_transportista' => 6],
-            ['nombre' => 'Plancha', 'precio_transportista' => 7],
-            ['nombre' => 'Bidon', 'precio_transportista' => 5],
-            ['nombre' => 'Galon', 'precio_transportista' => 4],
-            ['nombre' => 'Ropero', 'precio_transportista' => 15],
-            ['nombre' => 'Colchon', 'precio_transportista' => 12],
-            ['nombre' => 'Paquete', 'precio_transportista' => 5],
-            ['nombre' => 'Bolsa', 'precio_transportista' => 3],
-        ])->each(fn (array $tipo) => TipoPaquete::query()->updateOrCreate(
-            ['nombre' => $tipo['nombre']],
-            [
-                'precio_transportista' => $tipo['precio_transportista'],
-                'activo' => true,
-            ],
-        ));
 
         Cliente::query()->updateOrCreate([
             'dni' => '12345678',

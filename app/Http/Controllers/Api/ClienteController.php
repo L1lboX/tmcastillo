@@ -83,6 +83,16 @@ class ClienteController extends Controller
 
     public function destroy(Cliente $cliente): JsonResponse
     {
+        $saldoDeuda = $cliente->cuentasCorrientes()
+            ->selectRaw('SUM(CASE WHEN tipo = "debe" THEN monto ELSE -monto END) as saldo')
+            ->value('saldo') ?? 0;
+
+        if ($saldoDeuda > 0) {
+            throw ValidationException::withMessages([
+                'cliente' => 'No se puede eliminar. El cliente tiene una deuda pendiente de S/ ' . number_format($saldoDeuda, 2),
+            ]);
+        }
+
         $cliente->delete();
 
         return response()->json(['ok' => true]);

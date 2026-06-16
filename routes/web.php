@@ -1,10 +1,10 @@
 <?php
 
+use App\Http\Controllers\Api\AsignacionCargaController;
 use App\Http\Controllers\Api\ClienteController;
 use App\Http\Controllers\Api\CuentaCorrienteController;
 use App\Http\Controllers\Api\EnvioController;
 use App\Http\Controllers\Api\RoleController;
-use App\Http\Controllers\Api\TipoPaqueteController;
 use App\Http\Controllers\Api\TransportistaController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\ContactController;
@@ -60,6 +60,10 @@ Route::get('/sistema', function () {
     return view('envios.index');
 })->middleware('auth')->name('sistema');
 
+Route::get('/asignacion-carga', function () {
+    return view('asignacion.index');
+})->middleware('auth')->name('asignacion');
+
 Route::middleware('auth')->prefix('api')->group(function (): void {
     Route::get('/me', [UserController::class, 'me']);
 
@@ -77,6 +81,16 @@ Route::middleware('auth')->prefix('api')->group(function (): void {
     Route::put('/envios/{envio}', [EnvioController::class, 'update'])
         ->middleware('permission:envios.update');
     Route::put('/envios/{envio}/liquidacion', [EnvioController::class, 'liquidar'])
+        ->middleware('permission:envios.amounts');
+    Route::patch('/envios/{envio}/estado', [EnvioController::class, 'cambiarEstado'])
+        ->middleware('permission:envios.update');
+    Route::patch('/envios/{envio}/pagar-transportista', [EnvioController::class, 'pagarTransportista'])
+        ->middleware('permission:envios.amounts');
+    Route::post('/envios/pagar-transportista-lote', [EnvioController::class, 'pagarTransportistaLote'])
+        ->middleware('permission:envios.amounts');
+    Route::get('/transportistas-con-deuda', [EnvioController::class, 'transportistasConDeuda'])
+        ->middleware('permission:envios.amounts');
+    Route::get('/transportistas/{transportista}/envios-pendientes', [EnvioController::class, 'enviosPendientesTransportista'])
         ->middleware('permission:envios.amounts');
     Route::delete('/envios/{envio}', [EnvioController::class, 'destroy'])
         ->middleware('permission:envios.delete');
@@ -96,8 +110,12 @@ Route::middleware('auth')->prefix('api')->group(function (): void {
 
     Route::get('/transportistas', [TransportistaController::class, 'index'])
         ->middleware('permission:envios.create');
+    Route::get('/transportistas/metrics', [TransportistaController::class, 'metrics'])
+        ->middleware('permission:envios.amounts');
     Route::get('/transportistas/{transportista}', [TransportistaController::class, 'show'])
         ->middleware('permission:envios.create');
+    Route::get('/transportistas/{transportista}/envios', [TransportistaController::class, 'envios'])
+        ->middleware('permission:envios.amounts');
     Route::post('/transportistas', [TransportistaController::class, 'store'])
         ->middleware('permission:transportistas.manage');
     Route::put('/transportistas/{transportista}', [TransportistaController::class, 'update'])
@@ -107,16 +125,20 @@ Route::middleware('auth')->prefix('api')->group(function (): void {
     Route::patch('/transportistas/{transportista}/toggle', [TransportistaController::class, 'toggleActive'])
         ->middleware('permission:transportistas.manage');
 
-    Route::get('/tipos-paquete', [TipoPaqueteController::class, 'index'])
+    Route::get('/asignacion-carga', [AsignacionCargaController::class, 'index'])
         ->middleware('permission:envios.create');
-    Route::get('/tipos-paquete/{tipoPaquete}', [TipoPaqueteController::class, 'show'])
-        ->middleware('permission:tipos_paquete.manage');
-    Route::post('/tipos-paquete', [TipoPaqueteController::class, 'store'])
-        ->middleware('permission:tipos_paquete.manage');
-    Route::put('/tipos-paquete/{tipoPaquete}', [TipoPaqueteController::class, 'update'])
-        ->middleware('permission:tipos_paquete.manage');
-    Route::delete('/tipos-paquete/{tipoPaquete}', [TipoPaqueteController::class, 'destroy'])
-        ->middleware('permission:tipos_paquete.manage');
+    Route::get('/asignacion-carga/{envio}', [AsignacionCargaController::class, 'show'])
+        ->middleware('permission:envios.create');
+    Route::post('/asignacion-carga/asignar', [AsignacionCargaController::class, 'asignar'])
+        ->middleware('permission:envios.create');
+    Route::post('/asignacion-carga/desasignar', [AsignacionCargaController::class, 'desasignar'])
+        ->middleware('permission:envios.create');
+    Route::post('/asignacion-carga/bulk', [AsignacionCargaController::class, 'bulkAsignar'])
+        ->middleware('permission:envios.create');
+    Route::post('/asignacion-carga/bulk-desasignar', [AsignacionCargaController::class, 'bulkDesasignar'])
+        ->middleware('permission:envios.create');
+    Route::post('/asignacion-carga/envio', [AsignacionCargaController::class, 'asignarEnvio'])
+        ->middleware('permission:envios.create');
 
     Route::middleware('permission:users.manage')->group(function (): void {
         Route::get('/users', [UserController::class, 'index']);

@@ -4,19 +4,23 @@ const state = {
     roles: [],
     userRoles: [],
     permissions: [],
-    packageTypes: [],
     pendingAmounts: [],
     debtClients: [],
     debtMovements: [],
     selectedDebtClient: null,
+    liquidaciones: [],
+    liqEnvios: [],
+    liqTransportistaId: null,
+    gestionTransportistaId: null,
+    gestionEnvios: [],
     nextCode: "ENV-0001",
     editingId: null,
     editingUserId: null,
     editingRoleId: null,
-    editingPackageTypeId: null,
     editingClienteId: null,
     editingCarrierId: null,
     liquidatingEnvioId: null,
+    items: [{ cantidad: "", descripcion: "" }],
     pagination: { page: 1, lastPage: 1, total: 0 },
     filters: {
         q: "",
@@ -24,10 +28,44 @@ const state = {
         fecha_desde: "",
         fecha_hasta: "",
     },
-    spec: { tamano: "", peso: "" },
 };
 
 const $ = (selector) => document.querySelector(selector);
+
+function showConfirmModal(message) {
+    return new Promise((resolve) => {
+        const modal = $("#confirm-modal");
+        const messageEl = $("#confirm-modal-message");
+        const btnYes = $("#btn-confirm-yes");
+        const btnNo = $("#btn-confirm-no");
+
+        messageEl.textContent = message;
+        modal.classList.add("open");
+        modal.setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+
+        const cleanup = () => {
+            modal.classList.remove("open");
+            modal.setAttribute("aria-hidden", "true");
+            document.body.style.overflow = "";
+            btnYes.removeEventListener("click", onYes);
+            btnNo.removeEventListener("click", onNo);
+        };
+
+        const onYes = () => {
+            cleanup();
+            resolve(true);
+        };
+
+        const onNo = () => {
+            cleanup();
+            resolve(false);
+        };
+
+        btnYes.addEventListener("click", onYes);
+        btnNo.addEventListener("click", onNo);
+    });
+}
 const can = (permission) => (window.AppContext?.user?.permissions || []).includes(permission);
 const on = (selector, event, callback) => {
     const element = $(selector);
@@ -99,7 +137,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (can("clientes.manage") || can("transportistas.manage") || can("envios.create")) {
         loadManagementLists();
     }
-    loadPackageTypes(true);
 });
 
 function initLoginCanvas() {
@@ -158,51 +195,16 @@ function bindEvents() {
     initSidebarGroups();
 
     const debouncedClientSearch = debounce(searchClient, 220);
-    const debouncedTransportistaSearch = debounce(searchTransportista, 220);
 
     document.addEventListener("input", (event) => {
         if (event.target?.id === "f-cliente-search") {
             debouncedClientSearch();
-        }
-
-        if (event.target?.id === "f-transportista") {
-            debouncedTransportistaSearch();
-        }
-
-        if (event.target?.id === "f-cantidad") {
-            event.target.value = event.target.value.replace(/[^0-9]/g, "");
-            updateDetalle();
-        }
-
-        if (event.target?.id === "f-tipo") {
-            renderTipoDropdown(event.target.value);
-            updateDetalle();
         }
     });
 
     document.addEventListener("focusin", (event) => {
         if (event.target?.id === "f-cliente-search") {
             searchClient();
-        }
-
-        if (event.target?.id === "f-transportista") {
-            searchTransportista();
-        }
-
-        if (event.target?.id === "f-tipo") {
-            renderTipoDropdown(event.target.value);
-        }
-    });
-
-    document.addEventListener("change", (event) => {
-        if (event.target?.id === "f-tamano") {
-            state.spec.tamano = event.target.value;
-            updateDetalle();
-        }
-
-        if (event.target?.id === "f-peso") {
-            state.spec.peso = event.target.value;
-            updateDetalle();
         }
     });
 
@@ -223,10 +225,9 @@ function bindEvents() {
     on("#btn-close-role-modal", "click", closeRoleModal);
     on("#btn-cancel-role-modal", "click", closeRoleModal);
     on("#btn-close-details-modal", "click", closeDetailsModal);
+    on("#btn-close-items-modal", "click", closeItemsModal);
+    on("#btn-add-item", "click", addItem);
     on("#btn-close-carrier-details-modal", "click", closeCarrierDetailsModal);
-    on("#btn-open-package-type-modal", "click", openPackageTypeModal);
-    on("#btn-close-package-type-modal", "click", closePackageTypeModal);
-    on("#btn-cancel-package-type-modal", "click", closePackageTypeModal);
     on("#btn-close-amount-modal", "click", closeAmountModal);
     on("#btn-cancel-amount-modal", "click", closeAmountModal);
     on("#btn-open-abono-modal", "click", openAbonoModal);
@@ -234,6 +235,11 @@ function bindEvents() {
     on("#btn-cancel-abono-modal", "click", closeAbonoModal);
     on("#abono-form", "submit", saveAbono);
     on("#btn-close-movements-modal", "click", closeMovementsModal);
+    on("#btn-close-liq-modal", "click", closeLiqModal);
+    on("#btn-cancel-liq-modal", "click", closeLiqModal);
+    on("#btn-liq-all", "click", liqAll);
+    on("#btn-close-gestion", "click", closeGestion);
+    on("#btn-liquidar-deuda", "click", liquidarDeudaTransportista);
     on("#btn-export", "click", exportEnvios);
     on("#btn-clear-filters", "click", clearFilters);
     $("#envio-modal")?.addEventListener("click", (event) => {
@@ -251,9 +257,6 @@ function bindEvents() {
     $("#role-modal")?.addEventListener("click", (event) => {
         if (event.target.id === "role-modal") closeRoleModal();
     });
-    $("#package-type-modal")?.addEventListener("click", (event) => {
-        if (event.target.id === "package-type-modal") closePackageTypeModal();
-    });
     $("#amount-modal")?.addEventListener("click", (event) => {
         if (event.target.id === "amount-modal") closeAmountModal();
     });
@@ -266,8 +269,14 @@ function bindEvents() {
     $("#details-modal")?.addEventListener("click", (event) => {
         if (event.target.id === "details-modal") closeDetailsModal();
     });
+    $("#items-modal")?.addEventListener("click", (event) => {
+        if (event.target.id === "items-modal") closeItemsModal();
+    });
     $("#carrier-details-modal")?.addEventListener("click", (event) => {
         if (event.target.id === "carrier-details-modal") closeCarrierDetailsModal();
+    });
+    $("#liq-modal")?.addEventListener("click", (event) => {
+        if (event.target.id === "liq-modal") closeLiqModal();
     });
 
     $("#search-input").addEventListener("input", debounce((event) => setFilter("q", event.target.value.trim()), 250));
@@ -291,7 +300,6 @@ function bindEvents() {
     on("#carrier-admin-form", "submit", saveAdminCarrier);
     on("#user-form", "submit", saveUser);
     on("#role-form", "submit", saveRole);
-    on("#package-type-form", "submit", savePackageType);
     on("#amount-form", "submit", saveAmount);
     on("#role-search-input", "input", debounce((event) => loadRoles(event.target.value.trim()), 250));
     on("#f-guia", "input", (event) => {
@@ -313,7 +321,6 @@ function showSection(section) {
         dashboard: ["Dashboard", "Indicadores y control operativo"],
         roles: ["Roles", "Permisos por tipo de usuario"],
         usuarios: ["Usuarios", "Cuentas de acceso al sistema"],
-        tipos: ["Tipos de paquete", "Precios por unidad"],
         montos: ["Montos", "Envios pendientes de liquidacion"],
         cuentas: ["Cuentas por cobrar", "Control de deudas y abonos"],
     };
@@ -341,12 +348,12 @@ function showSection(section) {
 
     if (section === "clientes" || section === "transportistas") {
         loadManagementLists();
+        if (section === "transportistas") {
+            closeGestion();
+        }
     }
     if (section === "roles") {
         loadRoles();
-    }
-    if (section === "tipos") {
-        loadPackageTypes(false);
     }
     if (section === "montos") {
         loadPendingAmounts();
@@ -448,7 +455,7 @@ function renderTable() {
     const tbody = $("#envios-tbody");
 
     if (!state.envios.length) {
-        tbody.innerHTML = `<tr><td class="empty-state" colspan="${can("envios.amounts") ? 11 : 10}">No hay envios registrados.</td></tr>`;
+        tbody.innerHTML = `<tr><td class="empty-state" colspan="${can("envios.amounts") ? 7 : 6}">No hay envios registrados.</td></tr>`;
         return;
     }
 
@@ -461,17 +468,12 @@ function renderTable() {
                 <td>
                     <strong>${escapeHtml(envio.cliente)}</strong>
                 </td>
-                <td class="col-hide-mob">
-                    <strong>${escapeHtml(envio.transportista || "-")}</strong>
-                </td>
-                <td class="col-hide-mob">${envio.cantidad}</td>
-                <td class="col-hide-mob cell-muted">${escapeHtml(envio.tipo)}</td>
-                <td class="col-hide-mob">${specBadges(envio)}</td>
                 <td class="col-hide-mob cell-code">${escapeHtml(envio.guia || "-")}</td>
                 <td class="col-hide-mob"><span class="badge ${badgeClass}">${escapeHtml(envio.pago)}</span></td>
                 ${can("envios.amounts") ? `<td class="col-hide-mob cell-code">${money(envio.monto)}</td>` : ""}
                 <td>
                     <div class="row-actions">
+                        <span class="material-icon" data-items="${envio.id}" title="Ver items" role="button" tabindex="0" aria-label="Ver items">inventory_2</span>
                         <span class="material-icon" data-details="${envio.id}" title="Ver detalles" role="button" tabindex="0" aria-label="Ver detalles">info</span>
                         ${can("envios.amounts") ? `<span class="material-icon" data-amount="${envio.id}" title="Registrar monto" role="button" tabindex="0" aria-label="Registrar monto">payments</span>` : ""}
                         ${can("envios.update") ? `<span class="material-icon" data-edit="${envio.id}" title="Editar" role="button" tabindex="0" aria-label="Editar">edit</span>` : ""}
@@ -482,6 +484,9 @@ function renderTable() {
         `;
     }).join("");
 
+    tbody.querySelectorAll("[data-items]").forEach((button) => {
+        button.addEventListener("click", () => showItems(Number(button.dataset.items)));
+    });
     tbody.querySelectorAll("[data-edit]").forEach((button) => {
         button.addEventListener("click", () => editEnvio(Number(button.dataset.edit)));
     });
@@ -550,6 +555,8 @@ function goToPage(page) {
 function openModal() {
     resetForm();
     $("#f-codigo").value = state.nextCode;
+    state.items = [{ cantidad: "", descripcion: "" }];
+    renderItems();
     $("#envio-modal").classList.add("open");
     $("#envio-modal").setAttribute("aria-hidden", "false");
     document.body.style.overflow = "hidden";
@@ -607,13 +614,6 @@ function closeRoleModal() {
     $("#role-modal").setAttribute("aria-hidden", "true");
     document.body.style.overflow = "";
     state.editingRoleId = null;
-}
-
-function closePackageTypeModal() {
-    $("#package-type-modal").classList.remove("open");
-    $("#package-type-modal").setAttribute("aria-hidden", "true");
-    document.body.style.overflow = "";
-    state.editingPackageTypeId = null;
 }
 
 function closeAmountModal() {
@@ -848,20 +848,17 @@ function renderDebtMovementsInModal() {
 
 function resetForm() {
     $("#envio-form").reset();
-    state.spec = { tamano: "", peso: "" };
     state.editingId = null;
+    state.items = [{ cantidad: "", descripcion: "" }];
     $("#envio-db-id").value = "";
     $("#f-cliente-id").value = "";
     $("#f-dni").value = "";
     $("#f-nombre").value = "";
     $("#f-telefono").value = "";
     $("#f-direccion").value = "";
-    $("#f-transportista-id").value = "";
     $("#modal-title").textContent = "Registrar envio";
-    if ($("#f-tipo-id")) $("#f-tipo-id").value = "";
     document.querySelectorAll(".field-error").forEach((item) => item.classList.remove("field-error"));
     $("#dni-status").textContent = "";
-    $("#transportista-status").textContent = "";
     hideClientForm();
     hideClientNotFound();
     setToday();
@@ -954,11 +951,12 @@ async function editCliente(id) {
 }
 
 async function deleteCliente(id) {
-    if (!confirm("Eliminar este cliente? Los envíos asociados no se eliminarán.")) return;
+    const confirmed = await showConfirmModal("¿Está seguro de eliminar este cliente? El historial de envíos se mantendrá.");
+    if (!confirmed) return;
 
     try {
         await api.delete(`/clientes/${id}`);
-        showToast("Cliente eliminado.");
+        showToast("Cliente eliminado correctamente.");
         loadManagementLists();
     } catch (error) {
         showToast(error.message, "error");
@@ -1072,11 +1070,12 @@ function closeCarrierDetailsModal() {
 }
 
 async function deleteCarrier(id) {
-    if (!confirm("Eliminar este transportista?")) return;
+    const confirmed = await showConfirmModal("¿Está seguro de eliminar este transportista? El historial de envíos se mantendrá.");
+    if (!confirmed) return;
 
     try {
         await api.delete(`/transportistas/${id}`);
-        showToast("Transportista eliminado.");
+        showToast("Transportista eliminado correctamente.");
         loadManagementLists();
     } catch (error) {
         showToast(error.message, "error");
@@ -1088,6 +1087,135 @@ async function toggleCarrierActive(id) {
         const response = await api.patch(`/transportistas/${id}/toggle`);
         const carrier = response.data;
         showToast(`Transportista ${carrier.activo ? "activado" : "desactivado"}.`);
+        loadManagementLists();
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+async function openGestion(transportistaId) {
+    state.gestionTransportistaId = transportistaId;
+
+    try {
+        const [carrierResponse, enviosResponse] = await Promise.all([
+            api.get(`/transportistas/${transportistaId}`),
+            api.get(`/transportistas/${transportistaId}/envios`),
+        ]);
+
+        const carrier = carrierResponse.data;
+        state.gestionEnvios = enviosResponse.data;
+
+        $("#gestion-carrier-name").textContent = carrier.nombre;
+        $("#gestion-carrier-info").textContent = `${carrier.documento || "Sin documento"} · ${carrier.telefono || "Sin teléfono"}`;
+
+        const totalEnvios = state.gestionEnvios.length;
+        const deudaTotal = state.gestionEnvios
+            .filter(e => e.liquidado_at && !e.pagado_transportista_at)
+            .reduce((sum, e) => sum + Number(e.costo_transportista || 0), 0);
+        const liquidados = state.gestionEnvios.filter(e => e.pagado_transportista_at).length;
+
+        $("#gestion-envios-total").textContent = totalEnvios;
+        $("#gestion-deuda-total").textContent = money(deudaTotal);
+        $("#gestion-liquidados").textContent = liquidados;
+
+        renderGestionEnvios();
+
+        $("#carrier-list-view").classList.add("hidden");
+        $("#carrier-gestion-view").classList.remove("hidden");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+function renderGestionEnvios() {
+    const list = $("#gestion-envios-list");
+    if (!list) return;
+
+    const envios = state.gestionEnvios || [];
+    const estados = ["Registrado", "En camino", "Entregado", "Devuelto"];
+
+    if (!envios.length) {
+        list.innerHTML = `<tr><td class="empty-state" colspan="8">Sin envíos registrados.</td></tr>`;
+        return;
+    }
+
+    list.innerHTML = envios.map((envio) => {
+        const estadoOptions = estados.map(e => `<option value="${e}" ${e === envio.estado ? "selected" : ""}>${e}</option>`).join("");
+        const liquidado = envio.liquidado_at ? `<span class="badge pagado">Sí</span>` : `<span class="badge contra">No</span>`;
+        const pagado = envio.pagado_transportista_at ? `<span class="badge pagado">Pagado</span>` : "";
+        const itemsSummary = envio.items ? envio.items.map(i => `${i.cantidad}x ${escapeHtml(i.descripcion)}`).join('<br>') : '-';
+        return `
+            <tr>
+                <td class="cell-code">${escapeHtml(envio.codigo)}</td>
+                <td class="cell-muted">${formatDate(envio.fecha)}</td>
+                <td class="cell-muted" style="font-size: 0.8rem;">${itemsSummary}</td>
+                <td class="cell-code">${money(envio.costo_transportista)}</td>
+                <td>
+                    <select class="gestion-estado-select" data-envio-id="${envio.id}" style="padding: 0.25rem; font-size: 0.85rem; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #e2e8f0;">
+                        ${estadoOptions}
+                    </select>
+                </td>
+                <td>${liquidado}</td>
+                <td>
+                    <div class="row-actions">
+                        ${envio.liquidado_at && !envio.pagado_transportista_at ? `<button class="button button-primary" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;" data-gestion-pagar="${envio.id}" type="button">Pagar</button>` : ""}
+                        ${pagado}
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join("");
+
+    list.querySelectorAll(".gestion-estado-select").forEach((select) => {
+        select.addEventListener("change", async (e) => {
+            try {
+                await api.patch(`/envios/${select.dataset.envioId}/estado`, { estado: e.target.value });
+                showToast(`Estado actualizado a "${e.target.value}".`);
+            } catch (error) {
+                showToast(error.message, "error");
+                openGestion(state.gestionTransportistaId);
+            }
+        });
+    });
+
+    list.querySelectorAll("[data-gestion-pagar]").forEach((button) => {
+        button.addEventListener("click", async () => {
+            try {
+                await api.patch(`/envios/${button.dataset.gestionPagar}/pagar-transportista`);
+                showToast("Pago registrado.");
+                openGestion(state.gestionTransportistaId);
+            } catch (error) {
+                showToast(error.message, "error");
+            }
+        });
+    });
+}
+
+function closeGestion() {
+    $("#carrier-gestion-view").classList.add("hidden");
+    $("#carrier-list-view").classList.remove("hidden");
+    state.gestionTransportistaId = null;
+    state.gestionEnvios = [];
+}
+
+async function liquidarDeudaTransportista() {
+    if (!state.gestionTransportistaId) return;
+
+    const pendientes = (state.gestionEnvios || []).filter(e => e.liquidado_at && !e.pagado_transportista_at);
+    if (!pendientes.length) {
+        showToast("No hay envíos pendientes de liquidar.");
+        return;
+    }
+
+    const total = pendientes.reduce((sum, e) => sum + Number(e.costo_transportista || 0), 0);
+    const confirmed = await showConfirmModal(`¿Liquidar ${pendientes.length} envío(s) por un total de ${money(total)}?`);
+    if (!confirmed) return;
+
+    try {
+        const response = await api.post("/envios/pagar-transportista-lote", { transportista_id: state.gestionTransportistaId });
+        showToast(`${response.data.pagados} envío(s) liquidado(s).`);
+        openGestion(state.gestionTransportistaId);
         loadManagementLists();
     } catch (error) {
         showToast(error.message, "error");
@@ -1206,73 +1334,6 @@ function hideClientForm() {
     });
 }
 
-async function searchTransportista() {
-    const search = $("#f-transportista").value.trim();
-    const dropdown = $("#transportista-dropdown");
-
-    try {
-        const response = await api.get(`/transportistas?search=${encodeURIComponent(search)}&active_only=1`);
-        if (!response.data.length) {
-            dropdown.classList.remove("open");
-            $("#f-transportista-id").value = "";
-            $("#transportista-status").textContent = "Transportista no encontrado. Puedes crearlo abajo.";
-            return;
-        }
-
-        dropdown.innerHTML = response.data.map((transportista) => `
-            <button type="button" data-id="${transportista.id}">
-                <span>${escapeHtml(transportista.nombre)}</span>
-                <small>${escapeHtml(transportista.documento || "")}</small>
-            </button>
-        `).join("");
-        dropdown.classList.add("open");
-
-        dropdown.querySelectorAll("button").forEach((button) => {
-            button.addEventListener("click", () => {
-                const transportista = response.data.find((item) => String(item.id) === button.dataset.id);
-                fillTransportista(transportista);
-                dropdown.classList.remove("open");
-            });
-        });
-    } catch (error) {
-        showToast(error.message, "error");
-    }
-}
-
-function fillTransportista(transportista) {
-    $("#f-transportista-id").value = transportista.id;
-    $("#f-transportista").value = transportista.nombre;
-    $("#transportista-status").textContent = "Transportista cargado.";
-}
-
-function renderTipoDropdown(search = "") {
-    const dropdown = $("#tipo-dropdown");
-    const query = search.toLowerCase();
-    const options = state.packageTypes
-        .filter((tipo) => tipo.activo !== false)
-        .filter((tipo) => tipo.nombre.toLowerCase().includes(query));
-
-    if (!options.length) {
-        dropdown.classList.remove("open");
-        return;
-    }
-
-    dropdown.innerHTML = options.map((tipo) => `
-        <button type="button" data-tipo="${escapeHtml(tipo.nombre)}">
-            <span>${escapeHtml(tipo.nombre)}</span>
-            <small>${money(tipo.precio_transportista)}</small>
-        </button>
-    `).join("");
-    dropdown.classList.add("open");
-    dropdown.querySelectorAll("button").forEach((button) => {
-        button.addEventListener("click", () => {
-            $("#f-tipo").value = button.dataset.tipo;
-            dropdown.classList.remove("open");
-            updateDetalle();
-        });
-    });
-}
-
 async function saveEnvio(event) {
     event.preventDefault();
 
@@ -1313,17 +1374,12 @@ function editEnvio(id) {
     $("#f-cliente-search").value = envio.cliente;
     $("#f-telefono").value = envio.telefono || "";
     $("#f-direccion").value = envio.direccion || "";
-    $("#f-transportista-id").value = envio.transportista_id || "";
-    $("#f-transportista").value = envio.transportista || "";
-    $("#f-cantidad").value = envio.cantidad;
-    $("#f-tipo").value = envio.tipo;
-    $("#f-detalle").value = envio.detalle;
     if ($("#f-guia")) $("#f-guia").value = envio.guia || "";
     if ($("#f-pago")) $("#f-pago").value = envio.pago;
     if ($("#f-monto")) $("#f-monto").value = envio.monto || "";
     $("#f-obs").value = envio.observacion || "";
-    setSpec("tamano", envio.especificacion_tamano);
-    setSpec("peso", envio.especificacion_peso);
+    state.items = envio.items && envio.items.length ? envio.items.map(i => ({ cantidad: String(i.cantidad), descripcion: i.descripcion })) : [{ cantidad: "", descripcion: "" }];
+    renderItems();
 }
 
 async function deleteEnvio(id) {
@@ -1351,6 +1407,18 @@ function showDetails(id) {
         docValue = escapeHtml(envio.cliente_dni);
     }
 
+    const hasMontos = envio.items && envio.items.some(i => i.monto > 0);
+    const itemsTotal = envio.items ? envio.items.reduce((sum, i) => sum + (parseFloat(i.monto) || 0), 0) : 0;
+    const montoHeader = hasMontos ? '<th class="item-monto-cell">Monto</th>' : '';
+    const itemsHtml = envio.items && envio.items.length ? envio.items.map((item) => `
+        <tr>
+            <td class="item-cantidad">${item.cantidad}</td>
+            <td>${escapeHtml(item.descripcion)}</td>
+            ${hasMontos ? `<td class="item-monto-cell">${money(item.monto || 0)}</td>` : ''}
+        </tr>
+    `).join('') : `<tr><td colspan="${hasMontos ? 3 : 2}" class="empty-state">Sin items</td></tr>`;
+    const itemsFooter = hasMontos ? `<tfoot><tr><td colspan="2" class="item-monto-cell">Total</td><td class="item-monto-cell">${money(itemsTotal)}</td></tr></tfoot>` : '';
+
     $("#details-body").innerHTML = `
         <div class="detail-grid">
             <div><span>Fecha</span><strong>${formatDate(envio.fecha)}</strong></div>
@@ -1358,34 +1426,24 @@ function showDetails(id) {
             <div><span>${docLabel}</span><strong>${docValue}</strong></div>
             <div><span>Telefono</span><strong>${escapeHtml(envio.telefono || "-")}</strong></div>
             <div><span>Direccion</span><strong>${escapeHtml(envio.direccion || "-")}</strong></div>
-            <div><span>Transportista</span><strong>${escapeHtml(envio.transportista || "-")}</strong></div>
-            <div><span>Cantidad</span><strong>${envio.cantidad}</strong></div>
-            <div><span>Tipo</span><strong>${escapeHtml(envio.tipo)}</strong></div>
             <div><span>Guia</span><strong>${escapeHtml(envio.guia || "-")}</strong></div>
             <div><span>Pago</span><strong>${escapeHtml(envio.pago)}</strong></div>
-            <div class="span-all"><span>Especificacion</span><strong>${specBadges(envio)}</strong></div>
-            <div class="span-all"><span>Detalle</span><p>${escapeHtml(envio.detalle || "-")}</p></div>
             <div class="span-all"><span>Observacion</span><p>${escapeHtml(envio.observacion || "-")}</p></div>
+            <div class="span-all">
+                <span>Items</span>
+                <div class="items-table">
+                    <table>
+                        <thead><tr><th>Cant.</th><th>Descripción</th>${montoHeader}</tr></thead>
+                        <tbody>${itemsHtml}</tbody>
+                        ${itemsFooter}
+                    </table>
+                </div>
+            </div>
         </div>
     `;
     $("#details-modal").classList.add("open");
     $("#details-modal").setAttribute("aria-hidden", "false");
     document.body.style.overflow = "hidden";
-}
-
-function specBadges(envio) {
-    const tamano = envio.especificacion_tamano;
-    const peso = envio.especificacion_peso;
-    const badges = [];
-
-    if (tamano) {
-        badges.push(`<span class="badge spec-size-${slug(tamano)}">${escapeHtml(tamano)}</span>`);
-    }
-    if (peso) {
-        badges.push(`<span class="badge spec-weight-${slug(peso)}">${escapeHtml(peso)}</span>`);
-    }
-
-    return badges.join(" ") || '<span class="cell-muted">-</span>';
 }
 
 function slug(value) {
@@ -1401,41 +1459,93 @@ function slugRole(value) {
     return slug(value).replace(/-/g, "_");
 }
 
-function setSpec(group, value) {
-    state.spec[group] = value || "";
-    const field = group === "tamano" ? $("#f-tamano") : $("#f-peso");
-    field.value = value || "";
+function addItem() {
+    state.items.push({ cantidad: "", descripcion: "" });
+    renderItems();
 }
 
-function updateDetalle() {
-    const cantidad = $("#f-cantidad").value.trim();
-    const tipo = $("#f-tipo").value.trim();
-    const tamano = $("#f-tamano").value;
-    const peso = $("#f-peso").value;
-    const parts = [];
+function removeItem(index) {
+    if (state.items.length <= 1) return;
+    state.items.splice(index, 1);
+    renderItems();
+}
 
-    if (cantidad) parts.push(cantidad);
-    if (tipo) parts.push(tipo.toLowerCase() + (Number(cantidad) > 1 ? "s" : ""));
+function renderItems() {
+    const container = $("#items-container");
+    if (!container) return;
 
-    state.spec.tamano = tamano;
-    state.spec.peso = peso;
+    container.innerHTML = state.items.map((item, index) => `
+        <div class="item-row" data-item-index="${index}">
+            <div class="form-grid four">
+                <label>
+                    <span>Cantidad</span>
+                    <input type="text" class="item-cantidad" value="${escapeHtml(item.cantidad)}" inputmode="numeric" placeholder="1">
+                </label>
+                <label class="span-2">
+                    <span>Descripción</span>
+                    <input type="text" class="item-descripcion" value="${escapeHtml(item.descripcion)}" placeholder="Ej: cajas pequeñas de mostaza de sachet">
+                </label>
+                <label>
+                    <span>&nbsp;</span>
+                    <button class="button button-soft" type="button" data-remove-item="${index}" ${state.items.length <= 1 ? 'disabled' : ''}>Quitar</button>
+                </label>
+            </div>
+        </div>
+    `).join('');
 
-    const specs = [tamano, peso].filter(Boolean);
-    if (specs.length) {
-        parts.push(`(${specs.map((item) => item.toLowerCase()).join(", ")})`);
-    }
+    container.querySelectorAll('.item-cantidad').forEach((input, i) => {
+        input.addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/[^0-9]/g, '');
+            state.items[i].cantidad = e.target.value;
+        });
+    });
+    container.querySelectorAll('.item-descripcion').forEach((input, i) => {
+        input.addEventListener('input', (e) => {
+            state.items[i].descripcion = e.target.value;
+        });
+    });
+    container.querySelectorAll('[data-remove-item]').forEach((btn) => {
+        btn.addEventListener('click', () => removeItem(Number(btn.dataset.removeItem)));
+    });
+}
 
-    if (parts.length) {
-        $("#f-detalle").value = `${parts.join(" ")}.`;
-    } else {
-        $("#f-detalle").value = "";
-    }
+function showItems(id) {
+    const envio = state.envios.find((item) => item.id === id);
+    if (!envio || !envio.items) return;
+
+    const hasMontos = envio.items.some(i => i.monto > 0);
+    const itemsTotal = envio.items.reduce((sum, i) => sum + (parseFloat(i.monto) || 0), 0);
+    const montoHeader = hasMontos ? '<th class="item-monto-cell">Monto</th>' : '';
+    const itemsFooter = hasMontos ? `<tfoot><tr><td colspan="2" class="item-monto-cell">Total</td><td class="item-monto-cell">${money(itemsTotal)}</td></tr></tfoot>` : '';
+
+    $("#items-title").textContent = `Items - ${envio.codigo}`;
+    const thead = $("#items-modal thead tr");
+    if (thead) thead.innerHTML = `<th>Cantidad</th><th>Descripción</th>${montoHeader}`;
+
+    $("#items-list").innerHTML = envio.items.length ? envio.items.map((item) => `
+        <tr>
+            <td class="item-cantidad">${item.cantidad}</td>
+            <td>${escapeHtml(item.descripcion)}</td>
+            ${hasMontos ? `<td class="item-monto-cell">${money(item.monto || 0)}</td>` : ''}
+        </tr>
+    `).join('') : `<tr><td colspan="${hasMontos ? 3 : 2}" class="empty-state">Sin items</td></tr>`;
+
+    const existingTfoot = $("#items-modal table tfoot");
+    if (existingTfoot) existingTfoot.remove();
+    if (itemsFooter) $("#items-modal table").insertAdjacentHTML('beforeend', itemsFooter);
+
+    $("#items-modal").classList.add("open");
+    $("#items-modal").setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+}
+
+function closeItemsModal() {
+    $("#items-modal").classList.remove("open");
+    $("#items-modal").setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
 }
 
 function envioPayload() {
-    const tipo = $("#f-tipo").value.trim();
-    const packageType = state.packageTypes.find((item) => item.nombre.toLowerCase() === tipo.toLowerCase());
-
     return {
         codigo: $("#f-codigo").value,
         fecha: $("#f-fecha").value,
@@ -1443,17 +1553,12 @@ function envioPayload() {
         cliente: $("#f-nombre").value.trim(),
         telefono: $("#f-telefono").value.trim(),
         direccion: $("#f-direccion").value.trim(),
-        transportista_id: $("#f-transportista-id").value || null,
-        cantidad: $("#f-cantidad").value.trim(),
-        tipo,
-        tipo_paquete_id: packageType?.id || null,
-        especificacion_tamano: state.spec.tamano,
-        especificacion_peso: state.spec.peso,
-        detalle: $("#f-detalle").value.trim(),
         guia: $("#f-guia") ? $("#f-guia").value.trim() : null,
-        pago: $("#f-pago") ? $("#f-pago").value : null,
-        monto: $("#f-monto") ? $("#f-monto").value : null,
         observacion: $("#f-obs").value.trim(),
+        items: state.items.filter(i => i.cantidad && i.descripcion.trim()).map(i => ({
+            cantidad: parseInt(i.cantidad, 10),
+            descripcion: i.descripcion.trim(),
+        })),
     };
 }
 
@@ -1500,10 +1605,6 @@ function validate(payload) {
     let valid = true;
     const required = {
         "#f-cliente-search": payload.cliente_id && payload.cliente,
-        "#f-transportista": payload.transportista_id,
-        "#f-cantidad": payload.cantidad,
-        "#f-tipo": payload.tipo,
-        "#f-detalle": payload.detalle,
     };
 
     if ($("#f-guia")) {
@@ -1516,6 +1617,11 @@ function validate(payload) {
         field.classList.toggle("field-error", empty);
         if (empty) valid = false;
     });
+
+    if (!payload.items || !payload.items.length) {
+        showToast("Agrega al menos un item con cantidad y descripción.", "error");
+        valid = false;
+    }
 
     return valid;
 }
@@ -1546,7 +1652,17 @@ async function loadManagementLists() {
             api.get("/transportistas"),
         ]);
         renderClientsTable(clientes.data);
-        renderCarriersTable(transportistas.data);
+
+        let metrics = {};
+        if (can("envios.amounts")) {
+            try {
+                const metricsResponse = await api.get("/transportistas/metrics");
+                metrics = metricsResponse.data;
+            } catch {
+                // metrics fail silently
+            }
+        }
+        renderCarriersTable(transportistas.data, metrics);
     } catch (error) {
         showToast(error.message, "error");
     }
@@ -1603,14 +1719,15 @@ function renderClientsTable(items) {
     });
 }
 
-function renderCarriersTable(items) {
+function renderCarriersTable(items, metrics = {}) {
     const list = $("#carriers-list");
     if (!items.length) {
-        list.innerHTML = `<tr><td class="empty-state" colspan="7">Sin transportistas registrados.</td></tr>`;
+        list.innerHTML = `<tr><td class="empty-state" colspan="${can("envios.amounts") ? 9 : 7}">Sin transportistas registrados.</td></tr>`;
         return;
     }
 
     const tipoLabels = { encomiendas: "Encomiendas", maquinaria: "Maquinaria", camion: "Camión" };
+    const showMetrics = can("envios.amounts");
 
     list.innerHTML = items.map((transportista) => {
         const tipos = transportista.tipos || [];
@@ -1624,9 +1741,13 @@ function renderCarriersTable(items) {
             ? `<span class="cell-code">${escapeHtml(transportista.documento)}</span>`
             : `<span class="cell-muted">-</span>`;
         const estadoDisplay = `<span class="badge ${transportista.activo ? "pagado" : "contra"}">${transportista.activo ? "Activo" : "Inactivo"}</span>`;
+        const m = metrics[transportista.id] || {};
         const canManage = can("transportistas.manage");
         const canDelete = can("transportistas.delete");
         const actions = [];
+        if (showMetrics) {
+            actions.push(`<button class="button button-primary" style="font-size: 0.8rem; padding: 0.25rem 0.75rem;" data-carrier-gestion="${transportista.id}" type="button">Gestionar</button>`);
+        }
         if (canManage) {
             actions.push(`<span class="material-icon" data-carrier-details="${transportista.id}" title="Ver detalles" role="button" tabindex="0" aria-label="Ver detalles">info</span>`);
             actions.push(`<span class="material-icon" data-carrier-edit="${transportista.id}" title="Editar" role="button" tabindex="0" aria-label="Editar transportista">edit</span>`);
@@ -1638,6 +1759,9 @@ function renderCarriersTable(items) {
         const actionsHtml = actions.length
             ? `<div class="row-actions">${actions.join("")}</div>`
             : "-";
+        const metricsCols = showMetrics
+            ? `<td class="cell-code">${m.envios_total || 0}</td><td class="cell-code" style="color: ${(m.deuda_pendiente || 0) > 0 ? '#f59e0b' : '#10b981'}">${money(m.deuda_pendiente || 0)}</td>`
+            : "";
         return `
         <tr>
             <td><strong>${escapeHtml(transportista.nombre)}</strong></td>
@@ -1646,6 +1770,7 @@ function renderCarriersTable(items) {
             <td>${tiposDisplay}</td>
             <td class="cell-muted">${escapeHtml(transportista.telefono || "-")}</td>
             <td>${estadoDisplay}</td>
+            ${metricsCols}
             <td>${actionsHtml}</td>
         </tr>`;
     }).join("");
@@ -1662,117 +1787,9 @@ function renderCarriersTable(items) {
     list.querySelectorAll("[data-carrier-delete]").forEach((button) => {
         button.addEventListener("click", () => deleteCarrier(Number(button.dataset.carrierDelete)));
     });
-}
-
-async function loadPackageTypes(activeOnly = false) {
-    try {
-        const params = new URLSearchParams();
-        if (activeOnly) params.set("active_only", "1");
-        const response = await api.get(`/tipos-paquete?${params.toString()}`);
-        state.packageTypes = response.data;
-        renderPackageTypesTable();
-        return response.data;
-    } catch (error) {
-        showToast(error.message, "error");
-        return [];
-    }
-}
-
-function renderPackageTypesTable() {
-    const list = $("#package-types-list");
-    if (!list) return;
-
-    if (!state.packageTypes.length) {
-        list.innerHTML = `<tr><td class="empty-state" colspan="5">Sin tipos de paquete registrados.</td></tr>`;
-        return;
-    }
-
-    list.innerHTML = state.packageTypes.map((tipo) => `
-        <tr>
-            <td>
-                <strong>${escapeHtml(tipo.nombre)}</strong>
-                <span class="cell-sub">${tipo.activo ? "Disponible" : "Inactivo"}</span>
-            </td>
-            <td class="cell-code">${money(tipo.precio_transportista)}</td>
-            <td class="cell-muted">${escapeHtml(tipo.descripcion || "-")}</td>
-            <td><span class="badge ${tipo.activo ? "pagado" : "contra"}">${tipo.activo ? "Activo" : "Inactivo"}</span></td>
-            <td>
-                <div class="row-actions">
-                    <span class="material-icon" data-package-edit="${tipo.id}" title="Editar" role="button" tabindex="0" aria-label="Editar tipo">edit</span>
-                    <span class="material-icon delete" data-package-delete="${tipo.id}" title="Eliminar" role="button" tabindex="0" aria-label="Eliminar tipo">delete</span>
-                </div>
-            </td>
-        </tr>
-    `).join("");
-
-    list.querySelectorAll("[data-package-edit]").forEach((button) => {
-        button.addEventListener("click", () => editPackageType(Number(button.dataset.packageEdit)));
+    list.querySelectorAll("[data-carrier-gestion]").forEach((button) => {
+        button.addEventListener("click", () => openGestion(Number(button.dataset.carrierGestion)));
     });
-    list.querySelectorAll("[data-package-delete]").forEach((button) => {
-        button.addEventListener("click", () => deletePackageType(Number(button.dataset.packageDelete)));
-    });
-}
-
-function openPackageTypeModal() {
-    $("#package-type-form").reset();
-    $("#package-type-id").value = "";
-    $("#package-type-active").checked = true;
-    state.editingPackageTypeId = null;
-    $("#package-type-modal-title").textContent = "Registrar tipo";
-    $("#package-type-modal").classList.add("open");
-    $("#package-type-modal").setAttribute("aria-hidden", "false");
-    document.body.style.overflow = "hidden";
-}
-
-function editPackageType(id) {
-    const tipo = state.packageTypes.find((item) => item.id === id);
-    if (!tipo) return;
-
-    openPackageTypeModal();
-    state.editingPackageTypeId = id;
-    $("#package-type-modal-title").textContent = "Editar tipo";
-    $("#package-type-id").value = tipo.id;
-    $("#package-type-name").value = tipo.nombre;
-    $("#package-type-price").value = tipo.precio_transportista;
-    $("#package-type-description").value = tipo.descripcion || "";
-    $("#package-type-active").checked = Boolean(tipo.activo);
-}
-
-async function savePackageType(event) {
-    event.preventDefault();
-
-    const payload = {
-        nombre: $("#package-type-name").value.trim(),
-        precio_transportista: $("#package-type-price").value,
-        descripcion: $("#package-type-description").value.trim(),
-        activo: $("#package-type-active").checked,
-    };
-
-    try {
-        if (state.editingPackageTypeId) {
-            await api.put(`/tipos-paquete/${state.editingPackageTypeId}`, payload);
-            showToast("Tipo actualizado correctamente.");
-        } else {
-            await api.post("/tipos-paquete", payload);
-            showToast("Tipo registrado correctamente.");
-        }
-        closePackageTypeModal();
-        loadPackageTypes(false);
-    } catch (error) {
-        showToast(error.message, "error");
-    }
-}
-
-async function deletePackageType(id) {
-    if (!confirm("Eliminar este tipo de paquete?")) return;
-
-    try {
-        await api.delete(`/tipos-paquete/${id}`);
-        showToast("Tipo eliminado.");
-        loadPackageTypes(false);
-    } catch (error) {
-        showToast(error.message, "error");
-    }
 }
 
 async function loadPendingAmounts() {
@@ -1792,21 +1809,19 @@ function renderPendingAmounts() {
     if (!list) return;
 
     if (!state.pendingAmounts.length) {
-        list.innerHTML = `<tr><td class="empty-state" colspan="8">No hay envios pendientes de monto.</td></tr>`;
+        list.innerHTML = `<tr><td class="empty-state" colspan="5">No hay envios pendientes de monto.</td></tr>`;
         return;
     }
 
     list.innerHTML = state.pendingAmounts.map((envio) => {
-        const costo = Number(envio.cantidad || 0) * Number(envio.precio_transportista || 0);
+        const itemsCount = envio.items ? envio.items.length : 0;
+        const itemsSummary = envio.items ? envio.items.map(i => `${i.cantidad}x`).join(', ') : '-';
         return `
             <tr>
                 <td class="cell-code">${escapeHtml(envio.codigo)}</td>
                 <td class="cell-muted">${formatDate(envio.fecha)}</td>
                 <td><strong>${escapeHtml(envio.cliente)}</strong></td>
-                <td class="cell-muted">${escapeHtml(envio.transportista || "-")}</td>
-                <td>${envio.cantidad}</td>
-                <td>${escapeHtml(envio.tipo)}</td>
-                <td class="cell-code">${money(costo)}</td>
+                <td>${itemsCount} item(s): ${escapeHtml(itemsSummary)}</td>
                 <td>
                     <button class="button button-primary button-with-icon" type="button" data-pending-amount="${envio.id}"><span class="material-icon">payments</span>Liquidar</button>
                 </td>
@@ -1828,14 +1843,72 @@ function openAmountModal(id) {
     $("#amount-form").reset();
     $("#amount-envio-id").value = id;
     $("#amount-payment").value = envio.pago && envio.pago !== "Pendiente" ? envio.pago : "Credito";
-    $("#amount-total").value = envio.monto || "";
+
+    const itemsTotal = envio.items ? envio.items.reduce((sum, i) => sum + (parseFloat(i.monto) || 0), 0) : 0;
+    $("#amount-total").value = envio.monto || (itemsTotal > 0 ? itemsTotal.toFixed(2) : "");
+
     $("#amount-summary").innerHTML = `
         <strong>${escapeHtml(envio.codigo)} - ${escapeHtml(envio.cliente || "Cliente")}</strong>
-        <span>${envio.cantidad} x ${escapeHtml(envio.tipo)} · costo estimado ${money(Number(envio.cantidad || 0) * Number(envio.precio_transportista || 0))}</span>
     `;
+
+    renderAmountItems(envio.items || []);
+
     $("#amount-modal").classList.add("open");
     $("#amount-modal").setAttribute("aria-hidden", "false");
     document.body.style.overflow = "hidden";
+}
+
+function renderAmountItems(items) {
+    const container = $("#amount-items-container");
+    const totalEl = $("#amount-items-total");
+    if (!container || !items.length) {
+        if (container) container.innerHTML = '<div style="color: var(--muted); font-size: 12px;">Sin items</div>';
+        if (totalEl) totalEl.textContent = '';
+        return;
+    }
+
+    container.innerHTML = items.map((item, index) => `
+        <div class="amount-item-row" data-item-id="${item.id || ''}">
+            <div class="amount-item-info">
+                <strong>${escapeHtml(item.descripcion)}</strong>
+                <small>Cantidad: ${item.cantidad}</small>
+            </div>
+            <input type="text" class="amount-item-monto" value="${item.monto > 0 ? item.monto : ''}" inputmode="decimal" placeholder="0.00" data-item-index="${index}">
+        </div>
+    `).join('');
+
+    updateAmountItemsTotal();
+
+    container.querySelectorAll('.amount-item-monto').forEach((input) => {
+        input.addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/[^0-9.]/g, '');
+            updateAmountItemsTotal();
+        });
+    });
+}
+
+function updateAmountItemsTotal() {
+    const inputs = document.querySelectorAll('#amount-items-container .amount-item-monto');
+    let total = 0;
+    inputs.forEach((input) => {
+        total += parseFloat(input.value) || 0;
+    });
+    const totalEl = $("#amount-items-total");
+    if (totalEl) {
+        totalEl.textContent = total > 0 ? `Suma: ${money(total)}` : '';
+    }
+}
+
+function getAmountItemsPayload() {
+    const rows = document.querySelectorAll('#amount-items-container .amount-item-row');
+    return Array.from(rows).map((row) => {
+        const id = row.dataset.itemId;
+        const input = row.querySelector('.amount-item-monto');
+        return {
+            id: id ? parseInt(id, 10) : null,
+            monto: parseFloat(input.value) || 0,
+        };
+    });
 }
 
 async function saveAmount(event) {
@@ -1845,6 +1918,7 @@ async function saveAmount(event) {
     const payload = {
         monto: $("#amount-total").value,
         pago: $("#amount-payment").value,
+        items: getAmountItemsPayload(),
     };
 
     try {
@@ -1853,6 +1927,170 @@ async function saveAmount(event) {
         showToast("Monto registrado correctamente.");
         loadEnvios();
         if ($("#pending-amounts-list")) loadPendingAmounts();
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+async function cambiarEstadoEnvio(id, estado) {
+    try {
+        await api.patch(`/envios/${id}/estado`, { estado });
+        showToast(`Estado actualizado a "${estado}".`);
+        loadEnvios();
+    } catch (error) {
+        showToast(error.message, "error");
+        loadEnvios();
+    }
+}
+
+async function pagarTransportistaIndividual(id) {
+    const confirmed = await showConfirmModal("¿Marcar este envío como pagado al transportista?");
+    if (!confirmed) return;
+
+    try {
+        await api.patch(`/envios/${id}/pagar-transportista`);
+        showToast("Pago al transportista registrado.");
+        loadEnvios();
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+async function loadLiquidaciones() {
+    if (!$("#liquidaciones-list")) return;
+
+    try {
+        const response = await api.get("/transportistas-con-deuda");
+        state.liquidaciones = response.data;
+        renderLiquidaciones();
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+function renderLiquidaciones() {
+    const list = $("#liquidaciones-list");
+    if (!list) return;
+
+    const data = state.liquidaciones;
+
+    const countEl = $("#liq-transportista-count");
+    const totalEl = $("#liq-total-amount");
+    if (countEl) countEl.textContent = data.length;
+    if (totalEl) totalEl.textContent = money(data.reduce((sum, t) => sum + Number(t.deuda_total || 0), 0));
+
+    if (!data.length) {
+        list.innerHTML = `<tr><td class="empty-state" colspan="6">No hay transportistas con deuda pendiente.</td></tr>`;
+        return;
+    }
+
+    list.innerHTML = data.map((t) => `
+        <tr>
+            <td><strong>${escapeHtml(t.nombre)}</strong></td>
+            <td class="cell-code">${escapeHtml(t.documento || "-")}</td>
+            <td class="cell-muted">${escapeHtml(t.telefono || "-")}</td>
+            <td class="cell-code">${t.envios_pendientes}</td>
+            <td class="cell-code">${money(t.deuda_total)}</td>
+            <td>
+                <div class="row-actions">
+                    <button class="button button-primary button-with-icon" type="button" data-liq-ver="${t.id}"><span class="material-icon">visibility</span>Ver envíos</button>
+                </div>
+            </td>
+        </tr>
+    `).join("");
+
+    list.querySelectorAll("[data-liq-ver]").forEach((button) => {
+        button.addEventListener("click", () => openLiqModal(Number(button.dataset.liqVer)));
+    });
+}
+
+async function openLiqModal(transportistaId) {
+    state.liqTransportistaId = transportistaId;
+
+    try {
+        const response = await api.get(`/transportistas/${transportistaId}/envios-pendientes`);
+        state.liqEnvios = response.data;
+        renderLiqModal();
+        $("#liq-modal").classList.add("open");
+        $("#liq-modal").setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+function renderLiqModal() {
+    const list = $("#liq-modal-list");
+    const summary = $("#liq-summary");
+    if (!list) return;
+
+    const data = state.liqEnvios;
+    const transportista = state.liquidaciones.find((t) => t.id === state.liqTransportistaId);
+    const nombreTransportista = transportista?.nombre || "Transportista";
+
+    $("#liq-modal-title").textContent = `Envíos pendientes - ${nombreTransportista}`;
+
+    const total = data.reduce((sum, e) => sum + Number(e.costo_transportista || 0), 0);
+    summary.innerHTML = `
+        <strong>${data.length} envío(s) pendiente(s)</strong>
+        <span>Total a pagar: ${money(total)}</span>
+    `;
+
+    if (!data.length) {
+        list.innerHTML = `<tr><td class="empty-state" colspan="7">No hay envíos pendientes.</td></tr>`;
+        return;
+    }
+
+    list.innerHTML = data.map((envio) => {
+        const itemsSummary = envio.items ? envio.items.map(i => `${i.cantidad}x`).join(', ') : '-';
+        return `
+        <tr>
+            <td class="cell-code">${escapeHtml(envio.codigo)}</td>
+            <td class="cell-muted">${formatDate(envio.fecha)}</td>
+            <td><strong>${escapeHtml(envio.cliente || "-")}</strong></td>
+            <td>${itemsSummary}</td>
+            <td class="cell-code">${money(envio.costo_transportista)}</td>
+            <td>
+                <button class="button button-primary button-with-icon" type="button" data-liq-pagar="${envio.id}" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;"><span class="material-icon" style="font-size: 1rem;">local_atm</span>Pagar</button>
+            </td>
+        </tr>
+    `}).join("");
+
+    list.querySelectorAll("[data-liq-pagar]").forEach((button) => {
+        button.addEventListener("click", async () => {
+            try {
+                await api.patch(`/envios/${button.dataset.liqPagar}/pagar-transportista`);
+                showToast("Pago registrado.");
+                openLiqModal(state.liqTransportistaId);
+                loadLiquidaciones();
+                loadEnvios();
+            } catch (error) {
+                showToast(error.message, "error");
+            }
+        });
+    });
+}
+
+function closeLiqModal() {
+    $("#liq-modal").classList.remove("open");
+    $("#liq-modal").setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+    state.liqEnvios = [];
+    state.liqTransportistaId = null;
+}
+
+async function liqAll() {
+    if (!state.liqTransportistaId) return;
+
+    const confirmed = await showConfirmModal("¿Liquidar todos los envíos pendientes de este transportista?");
+    if (!confirmed) return;
+
+    try {
+        const response = await api.post("/envios/pagar-transportista-lote", { transportista_id: state.liqTransportistaId });
+        showToast(`${response.data.pagados} envío(s) liquidado(s).`);
+        closeLiqModal();
+        loadLiquidaciones();
+        loadEnvios();
     } catch (error) {
         showToast(error.message, "error");
     }

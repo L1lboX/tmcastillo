@@ -61,8 +61,8 @@
                     @can('envios.view')
                         <button class="sidebar-link{{ auth()->user()->cannot('dashboard.view') ? ' active' : '' }}" type="button" data-section="envios">Envíos</button>
                     @endcan
-                    @can('tipos_paquete.manage')
-                        <button class="sidebar-link" type="button" data-section="tipos">Tipos de paquete</button>
+                    @can('envios.create')
+                        <a class="sidebar-link" href="{{ route('asignacion') }}">Asignación de Carga</a>
                     @endcan
                 </div>
 
@@ -208,10 +208,6 @@
                                         <th>ID</th>
                                         <th>Fecha</th>
                                         <th>Cliente</th>
-                                        <th class="col-hide-mob">Transportista</th>
-                                        <th class="col-hide-mob">Cant.</th>
-                                        <th class="col-hide-mob">Tipo</th>
-                                        <th class="col-hide-mob">Especificacion</th>
                                         <th class="col-hide-mob">Guia</th>
                                         <th class="col-hide-mob">Pago</th>
                                         @can('envios.amounts')
@@ -260,61 +256,88 @@
                 </section>
 
                 <section class="module-page hidden" data-page="transportistas">
-                    <section class="page-head">
-                        <div>
-                            <h1>Transportistas</h1>
-                            <p>Responsables disponibles para asignar paquetes.</p>
-                        </div>
-                        @can('transportistas.manage')
-                            <button class="button button-primary button-with-icon icon-truck-add" id="btn-open-carrier-modal" type="button">Nuevo transportista</button>
-                        @endcan
-                    </section>
+                    <div id="carrier-list-view">
+                        <section class="page-head">
+                            <div>
+                                <h1>Transportistas</h1>
+                                <p>Responsables disponibles para asignar paquetes.</p>
+                            </div>
+                            @can('transportistas.manage')
+                                <button class="button button-primary button-with-icon icon-truck-add" id="btn-open-carrier-modal" type="button">Nuevo transportista</button>
+                            @endcan
+                        </section>
 
-                    <section class="table-shell">
-                        <div class="table-scroll">
-                            <table>
-                                <thead>
+                        <section class="table-shell">
+                            <div class="table-scroll">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Nombre</th>
+                                            <th>Tipo</th>
+                                            <th>Documento</th>
+                                            <th>Especialidad</th>
+                                            <th>Telefono</th>
+                                            <th>Estado</th>
+                                            @can('envios.amounts')
+                                                <th>Envíos</th>
+                                                <th>Deuda</th>
+                                            @endcan
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="carriers-list"></tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
+
+                    <div id="carrier-gestion-view" class="hidden">
+                        <section class="page-head">
+                            <div>
+                                <h1 id="gestion-carrier-name">Transportista</h1>
+                                <p id="gestion-carrier-info" style="color: #94a3b8;">Detalles</p>
+                            </div>
+                            <button class="button button-with-icon icon-cancel" id="btn-close-gestion" type="button">Volver a transportistas</button>
+                        </section>
+
+                        <section class="stats-row" style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                            <div class="metric-card" style="flex: 1; min-width: 180px; background: #1e293b; border-radius: 0.5rem; padding: 1.25rem;">
+                                <small style="color: #94a3b8;">Envíos totales</small>
+                                <strong id="gestion-envios-total" style="font-size: 1.75rem; display: block; margin-top: 0.25rem;">0</strong>
+                            </div>
+                            <div class="metric-card" style="flex: 1; min-width: 180px; background: #1e293b; border-radius: 0.5rem; padding: 1.25rem;">
+                                <small style="color: #94a3b8;">Deuda pendiente</small>
+                                <strong id="gestion-deuda-total" style="font-size: 1.75rem; display: block; margin-top: 0.25rem; color: #f59e0b;">S/ 0.00</strong>
+                            </div>
+                            <div class="metric-card" style="flex: 1; min-width: 180px; background: #1e293b; border-radius: 0.5rem; padding: 1.25rem;">
+                                <small style="color: #94a3b8;">Liquidados</small>
+                                <strong id="gestion-liquidados" style="font-size: 1.75rem; display: block; margin-top: 0.25rem; color: #10b981;">0</strong>
+                            </div>
+                        </section>
+
+                        <section class="table-shell">
+                            <div class="table-scroll">
+                                <table>
+                                    <thead>
                                     <tr>
-                                        <th>Nombre</th>
-                                        <th>Tipo</th>
-                                        <th>Documento</th>
-                                        <th>Especialidad</th>
-                                        <th>Telefono</th>
+                                        <th>ID Envío</th>
+                                        <th>Fecha</th>
+                                        <th>Items</th>
+                                        <th>Costo</th>
                                         <th>Estado</th>
+                                        <th>Liquidado</th>
                                         <th>Acciones</th>
                                     </tr>
-                                </thead>
-                                <tbody id="carriers-list"></tbody>
-                            </table>
-                        </div>
-                    </section>
-                </section>
+                                    </thead>
+                                    <tbody id="gestion-envios-list"></tbody>
+                                </table>
+                            </div>
+                        </section>
 
-                <section class="module-page hidden" data-page="tipos">
-                    <section class="page-head">
-                        <div>
-                            <h1>Tipos de paquete</h1>
-                            <p>Precio que se paga al transportista por unidad.</p>
+                        <div style="margin-top: 1.5rem; text-align: right;">
+                            <button class="button button-primary button-with-icon icon-save" id="btn-liquidar-deuda" type="button">Liquidar deuda total</button>
                         </div>
-                        <button class="button button-primary button-with-icon icon-add" id="btn-open-package-type-modal" type="button">Nuevo tipo</button>
-                    </section>
-
-                    <section class="table-shell">
-                        <div class="table-scroll">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Tipo</th>
-                                        <th>Precio transportista</th>
-                                        <th>Descripcion</th>
-                                        <th>Estado</th>
-                                        <th>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="package-types-list"></tbody>
-                            </table>
-                        </div>
-                    </section>
+                    </div>
                 </section>
 
                 <section class="module-page hidden" data-page="montos">
@@ -333,10 +356,7 @@
                                         <th>ID</th>
                                         <th>Fecha</th>
                                         <th>Cliente</th>
-                                        <th>Transportista</th>
-                                        <th>Cant.</th>
-                                        <th>Tipo</th>
-                                        <th>Costo transportista</th>
+                                        <th>Items</th>
                                         <th>Acciones</th>
                                     </tr>
                                 </thead>
@@ -474,6 +494,28 @@
                 <button class="button button-with-icon icon-close" id="btn-close-details-modal" type="button">Cerrar</button>
             </header>
             <div class="modal-body details-body" id="details-body"></div>
+        </section>
+    </div>
+
+    <div class="modal-backdrop" id="items-modal" aria-hidden="true">
+        <section class="modal modal-small" role="dialog" aria-modal="true" aria-labelledby="items-title">
+            <header class="modal-head">
+                <h2 id="items-title">Items del envío</h2>
+                <button class="button button-with-icon icon-close" id="btn-close-items-modal" type="button">Cerrar</button>
+            </header>
+            <div class="modal-body">
+                <div class="items-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Cantidad</th>
+                                <th>Descripción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="items-list"></tbody>
+                    </table>
+                </div>
+            </div>
         </section>
     </div>
 
@@ -660,67 +702,13 @@
                 </div>
 
                 <div class="form-section">
-                    <h3>03 Transportista</h3>
-                    <div class="form-grid two">
-                        <label class="span-2 field-relative">
-                            <span>Transportista / busqueda</span>
-                            <input type="hidden" id="f-transportista-id">
-                            <input type="text" id="f-transportista" autocomplete="off" placeholder="Buscar transportista por nombre">
-                            <div class="dropdown" id="transportista-dropdown"></div>
-                            <small id="transportista-status"></small>
-                        </label>
-                    </div>
+                    <h3>03 Items del envío</h3>
+                    <div id="items-container"></div>
+                    <button class="button button-soft button-with-icon icon-add" id="btn-add-item" type="button" style="margin-top: 0.5rem;">Agregar item</button>
                 </div>
 
                 <div class="form-section">
-                    <h3>04 Datos del envío</h3>
-                    <div class="form-grid four">
-                        <label>
-                            <span>Cantidad</span>
-                            <input type="text" id="f-cantidad" inputmode="numeric" placeholder="1">
-                        </label>
-                        <label class="span-3 field-relative">
-                            <span>Tipo de paquete</span>
-                            <input type="text" id="f-tipo" autocomplete="off" placeholder="Caja, saco, paquete...">
-                            <div class="dropdown" id="tipo-dropdown"></div>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="form-section spec-layout">
-                    <h3>05 Especificación</h3>
-                    <label>
-                        <span>Tamaño</span>
-                        <select id="f-tamano">
-                            <option value="">Seleccionar</option>
-                            <option value="Pequeno">Pequeno</option>
-                            <option value="Mediano">Mediano</option>
-                            <option value="Grande">Grande</option>
-                            <option value="Extra grande">Extra grande</option>
-                        </select>
-                    </label>
-                    <label>
-                        <span>Peso</span>
-                        <select id="f-peso">
-                            <option value="">Seleccionar</option>
-                            <option value="Liviano">Liviano</option>
-                            <option value="Moderado">Moderado</option>
-                            <option value="Pesado">Pesado</option>
-                            <option value="Muy pesado">Muy pesado</option>
-                        </select>
-                    </label>
-                </div>
-
-                <div class="form-section">
-                    <h3>06 Detalle</h3>
-                    <label>
-                        <span>Detalle del envío</span>
-                        <textarea id="f-detalle" rows="3" placeholder="Se genera automáticamente y puedes editarlo"></textarea>
-                    </label>
-                </div>
-
-                <div class="form-section">
-                    <h3>07 Guía</h3>
+                    <h3>04 Guía</h3>
                     <div class="form-grid two">
                         <label>
                             <span>Guía de remitente</span>
@@ -730,7 +718,7 @@
                 </div>
 
                 <div class="form-section">
-                    <h3>08 Observación</h3>
+                    <h3>05 Observación</h3>
                     <label>
                         <span>Observaciones</span>
                         <textarea id="f-obs" rows="2" placeholder="Notas internas del envio"></textarea>
@@ -826,43 +814,6 @@
         </div>
     @endcan
 
-    @can('tipos_paquete.manage')
-        <div class="modal-backdrop" id="package-type-modal" aria-hidden="true">
-            <section class="modal modal-small" role="dialog" aria-modal="true" aria-labelledby="package-type-modal-title">
-                <header class="modal-head">
-                    <h2 id="package-type-modal-title">Registrar tipo</h2>
-                    <button class="button button-with-icon icon-close" id="btn-close-package-type-modal" type="button">Cerrar</button>
-                </header>
-
-                <form id="package-type-form" class="modal-body">
-                    <input type="hidden" id="package-type-id">
-                    <div class="form-grid two">
-                        <label>
-                            <span>Tipo</span>
-                            <input id="package-type-name" type="text" placeholder="Caja">
-                        </label>
-                        <label>
-                            <span>Precio transportista</span>
-                            <input id="package-type-price" type="number" min="0" step="0.01" placeholder="5.00">
-                        </label>
-                        <label class="span-2">
-                            <span>Descripcion</span>
-                            <input id="package-type-description" type="text" placeholder="Detalle interno">
-                        </label>
-                        <label class="check-row span-2">
-                            <input id="package-type-active" type="checkbox" checked>
-                            <span>Activo</span>
-                        </label>
-                    </div>
-                    <footer class="modal-actions">
-                        <button class="button button-with-icon icon-cancel" id="btn-cancel-package-type-modal" type="button">Cancelar</button>
-                        <button class="button button-primary button-with-icon icon-save" type="submit">Guardar tipo</button>
-                    </footer>
-                </form>
-            </section>
-        </div>
-    @endcan
-
     @can('envios.amounts')
         <div class="modal-backdrop" id="amount-modal" aria-hidden="true">
             <section class="modal modal-small" role="dialog" aria-modal="true" aria-labelledby="amount-modal-title">
@@ -874,6 +825,11 @@
                 <form id="amount-form" class="modal-body">
                     <input type="hidden" id="amount-envio-id">
                     <div class="amount-summary" id="amount-summary"></div>
+                    <div class="amount-items-section" id="amount-items-section">
+                        <h3>Monto por item</h3>
+                        <div id="amount-items-container"></div>
+                        <div class="amount-items-total" id="amount-items-total"></div>
+                    </div>
                     <div class="form-grid two">
                         <label>
                             <span>Monto cobrado</span>
@@ -961,6 +917,21 @@
             </section>
         </div>
     @endcan
+
+    <div class="modal-backdrop" id="confirm-modal" aria-hidden="true">
+        <section class="modal modal-small" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+            <header class="modal-head">
+                <h2 id="confirm-modal-title">Confirmar</h2>
+            </header>
+            <div class="modal-body">
+                <p id="confirm-modal-message" style="text-align: center; margin: 1rem 0;"></p>
+            </div>
+            <footer class="modal-actions">
+                <button class="button button-with-icon icon-cancel" id="btn-confirm-no" type="button">No</button>
+                <button class="button button-primary button-with-icon icon-save" id="btn-confirm-yes" type="button">Sí</button>
+            </footer>
+        </section>
+    </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </body>

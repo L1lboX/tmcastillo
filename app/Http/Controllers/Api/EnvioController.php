@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\CuentaCorriente;
 use App\Models\Envio;
-use App\Models\TipoPaquete;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,6 +16,7 @@ use Illuminate\Validation\Rule;
 class EnvioController extends Controller
 {
     private const PAGOS = ['Pendiente', 'Pagado', 'Contra Entrega', 'Credito'];
+    private const ESTADOS = ['Registrado', 'En camino', 'Entregado', 'Devuelto'];
 
     public function index(Request $request): JsonResponse
     {
@@ -46,7 +46,7 @@ class EnvioController extends Controller
     {
         return response()->json([
             'ok' => true,
-            'data' => $this->format($envio->load(['cliente', 'transportista'])),
+            'data' => $this->format($envio->load(['cliente', 'transportista', 'items'])),
         ]);
     }
 
@@ -57,12 +57,22 @@ class EnvioController extends Controller
             $data = $this->payload($request);
             $data['cliente_id'] = (int) ($request->input('cliente_id') ?: $cliente->id);
 
-            return Envio::query()->create($data);
+            $envio = Envio::query()->create($data);
+
+            foreach ($request->input('items', []) as $item) {
+                $envio->items()->create([
+                    'cantidad' => (int) $item['cantidad'],
+                    'descripcion' => trim($item['descripcion']),
+                    'monto' => (float) ($item['monto'] ?? 0),
+                ]);
+            }
+
+            return $envio;
         });
 
         return response()->json([
             'ok' => true,
-            'data' => $this->format($envio->load(['cliente', 'transportista'])),
+            'data' => $this->format($envio->load(['cliente', 'transportista', 'items'])),
         ], 201);
     }
 
@@ -73,11 +83,20 @@ class EnvioController extends Controller
             $data = $this->payload($request, $envio);
             $data['cliente_id'] = (int) ($request->input('cliente_id') ?: $cliente->id);
             $envio->update($data);
+
+            $envio->items()->delete();
+            foreach ($request->input('items', []) as $item) {
+                $envio->items()->create([
+                    'cantidad' => (int) $item['cantidad'],
+                    'descripcion' => trim($item['descripcion']),
+                    'monto' => (float) ($item['monto'] ?? 0),
+                ]);
+            }
         });
 
         return response()->json([
             'ok' => true,
-            'data' => $this->format($envio->refresh()->load(['cliente', 'transportista'])),
+            'data' => $this->format($envio->refresh()->load(['cliente', 'transportista', 'items'])),
         ]);
     }
 
@@ -86,20 +105,30 @@ class EnvioController extends Controller
         $validated = $request->validate([
             'pago' => ['required', Rule::in(['Pagado', 'Contra Entrega', 'Credito'])],
             'monto' => ['required', 'numeric', 'min:0', 'max:99999999.99'],
+            'items' => ['nullable', 'array'],
+            'items.*.id' => ['nullable', 'integer'],
+            'items.*.monto' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        $envio->load('tipoPaquete');
-        $costoTransportista = $this->costoTransportista($envio);
         $monto = round((float) $validated['monto'], 2);
 
-        DB::transaction(function () use ($envio, $validated, $costoTransportista, $monto): void {
+        DB::transaction(function () use ($envio, $validated, $monto): void {
             $envio->update([
                 'pago' => $validated['pago'],
                 'monto' => $monto,
-                'costo_transportista' => $costoTransportista,
-                'margen' => round($monto - $costoTransportista, 2),
                 'liquidado_at' => now(),
             ]);
+
+            if (! empty($validated['items'])) {
+                foreach ($validated['items'] as $itemData) {
+                    if (! empty($itemData['id'])) {
+                        $item = $envio->items()->find($itemData['id']);
+                        if ($item) {
+                            $item->update(['monto' => (float) ($itemData['monto'] ?? 0)]);
+                        }
+                    }
+                }
+            }
 
             if ($validated['pago'] === 'Credito') {
                 $existe = CuentaCorriente::query()
@@ -108,12 +137,7 @@ class EnvioController extends Controller
                     ->exists();
 
                 if (! $existe) {
-                    $ultimoSaldo = CuentaCorriente::query()
-                        ->where('cliente_id', $envio->cliente_id)
-                        ->latest('id')
-                        ->value('saldo_acumulado');
-
-                    $saldoActual = $ultimoSaldo !== null ? (float) $ultimoSaldo : $this->calcularSaldoCliente($envio->cliente_id);
+                    $saldoActual = $this->calcularSaldoCliente($envio->cliente_id);
                     $nuevoSaldo = round($saldoActual + $monto, 2);
 
                     CuentaCorriente::create([
@@ -133,12 +157,7 @@ class EnvioController extends Controller
                     ->sum('monto');
 
                 if ((float) $cargos > 0) {
-                    $ultimoSaldo = CuentaCorriente::query()
-                        ->where('cliente_id', $envio->cliente_id)
-                        ->latest('id')
-                        ->value('saldo_acumulado');
-
-                    $saldoActual = $ultimoSaldo !== null ? (float) $ultimoSaldo : $this->calcularSaldoCliente($envio->cliente_id);
+                    $saldoActual = $this->calcularSaldoCliente($envio->cliente_id);
                     $nuevoSaldo = round($saldoActual - $monto, 2);
 
                     CuentaCorriente::create([
@@ -156,7 +175,111 @@ class EnvioController extends Controller
 
         return response()->json([
             'ok' => true,
-            'data' => $this->format($envio->refresh()->load(['cliente', 'transportista', 'tipoPaquete'])),
+            'data' => $this->format($envio->refresh()->load(['cliente', 'transportista', 'items'])),
+        ]);
+    }
+
+    public function cambiarEstado(Request $request, Envio $envio): JsonResponse
+    {
+        $validated = $request->validate([
+            'estado' => ['required', Rule::in(self::ESTADOS)],
+        ]);
+
+        $envio->update(['estado' => $validated['estado']]);
+
+        return response()->json([
+            'ok' => true,
+            'data' => $this->format($envio->refresh()->load(['cliente', 'transportista', 'items'])),
+        ]);
+    }
+
+    public function pagarTransportista(Envio $envio): JsonResponse
+    {
+        if ($envio->pagado_transportista_at) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'envio' => 'Este envío ya fue pagado al transportista.',
+            ]);
+        }
+
+        if (! $envio->liquidado_at) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'envio' => 'El envío debe ser liquidado antes de pagar al transportista.',
+            ]);
+        }
+
+        $envio->update(['pagado_transportista_at' => now()]);
+
+        return response()->json([
+            'ok' => true,
+            'data' => $this->format($envio->refresh()->load(['cliente', 'transportista', 'items'])),
+        ]);
+    }
+
+    public function pagarTransportistaLote(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'transportista_id' => ['required', 'integer', 'exists:transportistas,id'],
+        ]);
+
+        $count = Envio::query()
+            ->where('transportista_id', $validated['transportista_id'])
+            ->whereNotNull('liquidado_at')
+            ->whereNull('pagado_transportista_at')
+            ->update(['pagado_transportista_at' => now()]);
+
+        return response()->json([
+            'ok' => true,
+            'data' => ['pagados' => $count],
+        ]);
+    }
+
+    public function transportistasConDeuda(): JsonResponse
+    {
+        $transportistas = \App\Models\Transportista::query()
+            ->withCount(['envios as envios_pendientes' => function ($query) {
+                $query->whereNotNull('liquidado_at')
+                    ->whereNull('pagado_transportista_at');
+            }])
+            ->get()
+            ->map(function ($transportista) {
+                $deudaTotal = Envio::query()
+                    ->where('transportista_id', $transportista->id)
+                    ->whereNotNull('liquidado_at')
+                    ->whereNull('pagado_transportista_at')
+                    ->sum('costo_transportista');
+
+                return [
+                    'id' => $transportista->id,
+                    'nombre' => $transportista->nombre,
+                    'documento' => $transportista->documento,
+                    'telefono' => $transportista->telefono,
+                    'envios_pendientes' => $transportista->envios_pendientes,
+                    'deuda_total' => round((float) $deudaTotal, 2),
+                ];
+            })
+            ->filter(fn ($t) => $t['envios_pendientes'] > 0)
+            ->values();
+
+        return response()->json([
+            'ok' => true,
+            'data' => $transportistas,
+        ]);
+    }
+
+    public function enviosPendientesTransportista(int $transportistaId): JsonResponse
+    {
+        $envios = Envio::query()
+            ->with(['cliente', 'items'])
+            ->where('transportista_id', $transportistaId)
+            ->whereNotNull('liquidado_at')
+            ->whereNull('pagado_transportista_at')
+            ->latest('id')
+            ->get()
+            ->map(fn (Envio $envio) => $this->format($envio));
+
+        return response()->json([
+            'ok' => true,
+            'data' => $envios,
         ]);
     }
 
@@ -194,11 +317,7 @@ class EnvioController extends Controller
             'Documento',
             'Telefono',
             'Direccion',
-            'Transportista',
-            'Cantidad',
-            'Tipo',
-            'Especificacion',
-            'Detalle',
+            'Items',
             'Guia',
             'Pago',
             ...($request->user()?->can('envios.amounts') ? ['Monto'] : []),
@@ -206,6 +325,10 @@ class EnvioController extends Controller
         ];
 
         $rows = $envios->map(function (array $envio) use ($request): array {
+            $itemsText = collect($envio['items'] ?? [])->map(function ($item) {
+                return $item['cantidad'].' - '.$item['descripcion'];
+            })->implode(' | ');
+
             return [
                 $envio['codigo'],
                 $envio['fecha'],
@@ -213,11 +336,7 @@ class EnvioController extends Controller
                 $envio['cliente_dni'] ?? '-',
                 $envio['telefono'],
                 $envio['direccion'],
-                $envio['transportista'],
-                $envio['cantidad'],
-                $envio['tipo'],
-                $envio['especificacion'],
-                $envio['detalle'],
+                $itemsText ?: '-',
                 $envio['guia'],
                 $envio['pago'],
                 ...($request->user()?->can('envios.amounts') ? [$envio['monto'] ?? ''] : []),
@@ -242,13 +361,6 @@ class EnvioController extends Controller
             'codigo' => ['nullable', 'string', 'max:20'],
             'fecha' => ['required', 'date'],
             'cliente_id' => ['nullable', 'integer', 'exists:clientes,id'],
-            'transportista_id' => ['nullable', 'integer', 'exists:transportistas,id'],
-            'cantidad' => ['required', 'integer', 'min:1'],
-            'tipo' => ['required', 'string', 'max:80'],
-            'tipo_paquete_id' => ['nullable', 'integer', 'exists:tipo_paquetes,id'],
-            'especificacion_tamano' => ['nullable', 'string', 'max:40'],
-            'especificacion_peso' => ['nullable', 'string', 'max:40'],
-            'detalle' => ['required', 'string'],
             'guia' => [
                 'required',
                 'string',
@@ -256,35 +368,30 @@ class EnvioController extends Controller
                 'regex:/^[A-Za-z0-9-]+$/',
                 Rule::unique('envios', 'guia')->ignore($envio?->id),
             ],
-            'pago' => ['nullable', Rule::in(self::PAGOS)],
-            'monto' => ['nullable', 'numeric', 'min:0', 'max:99999999.99'],
             'observacion' => ['nullable', 'string'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.cantidad' => ['required', 'integer', 'min:1'],
+            'items.*.descripcion' => ['required', 'string'],
+            'items.*.monto' => ['nullable', 'numeric', 'min:0'],
         ];
 
         $validated = $request->validate($rules, [
             'guia.required' => 'La guia de remitente es obligatoria.',
             'guia.regex' => 'La guia de remitente solo acepta letras, numeros y guiones.',
             'guia.unique' => 'La guia ingresada ya existe.',
-            'pago.in' => 'El estado de pago no es valido.',
+            'items.required' => 'Debe agregar al menos un item.',
+            'items.min' => 'Debe agregar al menos un item.',
+            'items.*.cantidad.required' => 'La cantidad es obligatoria.',
+            'items.*.cantidad.integer' => 'La cantidad debe ser un número entero.',
+            'items.*.cantidad.min' => 'La cantidad debe ser al menos 1.',
+            'items.*.descripcion.required' => 'La descripción es obligatoria.',
+            'items.*.monto.numeric' => 'El monto del item debe ser un número.',
+            'items.*.monto.min' => 'El monto del item no puede ser negativo.',
         ]);
-
-        $tipoPaqueteId = $validated['tipo_paquete_id'] ?? null;
-        if (! $tipoPaqueteId) {
-            $tipoPaqueteId = TipoPaquete::query()
-                ->where('nombre', trim($validated['tipo']))
-                ->value('id');
-        }
 
         $data = [
             'codigo' => trim((string) ($validated['codigo'] ?? '')) ?: $this->nextCode(),
             'fecha' => $validated['fecha'],
-            'transportista_id' => $validated['transportista_id'] ?? null,
-            'cantidad' => (int) $validated['cantidad'],
-            'tipo' => trim($validated['tipo']),
-            'tipo_paquete_id' => $tipoPaqueteId,
-            'especificacion_tamano' => trim((string) ($validated['especificacion_tamano'] ?? '')) ?: null,
-            'especificacion_peso' => trim((string) ($validated['especificacion_peso'] ?? '')) ?: null,
-            'detalle' => trim($validated['detalle']),
             'guia' => strtoupper(trim($validated['guia'])),
             'observacion' => trim((string) ($validated['observacion'] ?? '')) ?: null,
         ];
@@ -307,20 +414,17 @@ class EnvioController extends Controller
     {
         $q = trim((string) $request->query('q', ''));
         $pago = trim((string) $request->query('pago', ''));
-        $tipo = trim((string) $request->query('tipo', ''));
         $cliente = trim((string) $request->query('cliente', ''));
         $transportista = trim((string) $request->query('transportista', ''));
         $fechaDesde = trim((string) $request->query('fecha_desde', ''));
         $fechaHasta = trim((string) $request->query('fecha_hasta', ''));
 
         return Envio::query()
-            ->with(['cliente', 'transportista', 'tipoPaquete'])
+            ->with(['cliente', 'transportista', 'items'])
             ->when($q !== '', function (Builder $query) use ($q): void {
                 $query->where(function (Builder $query) use ($q): void {
                     $query->where('codigo', 'like', "%{$q}%")
                         ->orWhere('guia', 'like', "%{$q}%")
-                        ->orWhere('tipo', 'like', "%{$q}%")
-                        ->orWhere('detalle', 'like', "%{$q}%")
                         ->orWhereHas('cliente', function (Builder $query) use ($q): void {
                             $query->where('nombre', 'like', "%{$q}%")
                                 ->orWhere('dni', 'like', "%{$q}%");
@@ -328,11 +432,13 @@ class EnvioController extends Controller
                         ->orWhereHas('transportista', function (Builder $query) use ($q): void {
                             $query->where('nombre', 'like', "%{$q}%")
                                 ->orWhere('documento', 'like', "%{$q}%");
+                        })
+                        ->orWhereHas('items', function (Builder $query) use ($q): void {
+                            $query->where('descripcion', 'like', "%{$q}%");
                         });
                 });
             })
             ->when($pago !== '', fn (Builder $query) => $query->where('pago', $pago))
-            ->when($tipo !== '', fn (Builder $query) => $query->where('tipo', 'like', "%{$tipo}%"))
             ->when($cliente !== '', function (Builder $query) use ($cliente): void {
                 $query->whereHas('cliente', function (Builder $query) use ($cliente): void {
                     $query->where('nombre', 'like', "%{$cliente}%")
@@ -555,9 +661,6 @@ XML;
 
     private function format(Envio $envio): array
     {
-        $tamano = $envio->especificacion_tamano;
-        $peso = $envio->especificacion_peso;
-
         return [
             'id' => $envio->id,
             'codigo' => $envio->codigo,
@@ -572,29 +675,22 @@ XML;
             'transportista' => $envio->transportista?->nombre,
             'transportista_documento' => $envio->transportista?->documento,
             'transportista_telefono' => $envio->transportista?->telefono,
-            'cantidad' => $envio->cantidad,
-            'tipo_paquete_id' => $envio->tipo_paquete_id,
-            'tipo' => $envio->tipo,
-            'precio_transportista' => $envio->tipoPaquete?->precio_transportista,
-            'especificacion_tamano' => $tamano,
-            'especificacion_peso' => $peso,
-            'especificacion' => collect([$tamano, $peso])->filter()->join(' / ') ?: '-',
-            'detalle' => $envio->detalle,
+            'items' => $envio->items->map(fn ($item) => [
+                'id' => $item->id,
+                'cantidad' => $item->cantidad,
+                'descripcion' => $item->descripcion,
+                'monto' => $item->monto,
+            ])->values(),
             'guia' => $envio->guia,
             'pago' => $envio->pago,
+            'estado' => $envio->estado ?? 'Registrado',
             'monto' => request()->user()?->can('envios.amounts') ? $envio->monto : null,
             'costo_transportista' => request()->user()?->can('envios.amounts') ? $envio->costo_transportista : null,
             'margen' => request()->user()?->can('envios.amounts') ? $envio->margen : null,
             'liquidado_at' => request()->user()?->can('envios.amounts') ? $envio->liquidado_at?->format('Y-m-d H:i:s') : null,
+            'pagado_transportista_at' => request()->user()?->can('envios.amounts') ? $envio->pagado_transportista_at?->format('Y-m-d H:i:s') : null,
             'observacion' => $envio->observacion,
         ];
-    }
-
-    private function costoTransportista(Envio $envio): float
-    {
-        $precio = (float) ($envio->tipoPaquete?->precio_transportista ?? 0);
-
-        return round($envio->cantidad * $precio, 2);
     }
 
     private function calcularSaldoCliente(int $clienteId): float
@@ -609,12 +705,6 @@ XML;
             ->where('tipo', 'abono')
             ->sum('monto');
 
-        $enviosCredito = Envio::query()
-            ->where('cliente_id', $clienteId)
-            ->where('pago', 'Credito')
-            ->whereNotNull('monto')
-            ->sum('monto');
-
-        return round(((float) $cargos + (float) $enviosCredito - (float) $abonos), 2);
+        return round(((float) $cargos - (float) $abonos), 2);
     }
 }

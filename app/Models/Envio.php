@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
@@ -12,18 +13,14 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'fecha',
     'cliente_id',
     'transportista_id',
-    'cantidad',
-    'tipo',
-    'tipo_paquete_id',
-    'especificacion_tamano',
-    'especificacion_peso',
-    'detalle',
     'guia',
     'pago',
+    'estado',
     'monto',
     'costo_transportista',
     'margen',
     'liquidado_at',
+    'pagado_transportista_at',
     'observacion',
 ])]
 class Envio extends Model
@@ -32,12 +29,12 @@ class Envio extends Model
     {
         return [
             'fecha' => 'date:Y-m-d',
-            'cantidad' => 'integer',
             'cliente_id' => 'integer',
             'monto' => 'decimal:2',
             'costo_transportista' => 'decimal:2',
             'margen' => 'decimal:2',
             'liquidado_at' => 'datetime',
+            'pagado_transportista_at' => 'datetime',
         ];
     }
 
@@ -51,9 +48,9 @@ class Envio extends Model
         return $this->belongsTo(Transportista::class);
     }
 
-    public function tipoPaquete(): BelongsTo
+    public function items(): HasMany
     {
-        return $this->belongsTo(TipoPaquete::class);
+        return $this->hasMany(EnvioItem::class);
     }
 
     public function cuentaCorriente(): HasOne
