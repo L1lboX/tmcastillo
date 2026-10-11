@@ -166,28 +166,46 @@ class TransportistaController extends Controller
             ->latest('id')
             ->get()
             ->map(function (Envio $envio) use ($transportista) {
-                // El costo que le corresponde a este transportista en este envío
-                $costoFlete = $envio->items->isNotEmpty()
-                    ? (float) $envio->items->sum('costo_transportista')
+                $items = $envio->items;
+                $tieneItems = $items->isNotEmpty();
+
+                // Costo total del flete para este transportista
+                $costoFlete = $tieneItems
+                    ? (float) $items->sum('costo_transportista')
                     : (float) ($envio->costo_transportista ?? 0);
 
+                // Costo pendiente real para este transportista
+                $costoPendiente = $tieneItems
+                    ? (float) $items->whereNull('pagado_transportista_at')->sum('costo_transportista')
+                    : ($envio->pagado_transportista_at ? 0.0 : $costoFlete);
+
+                // Determinar fecha de pago para este transportista
+                $pagadoAt = $tieneItems
+                    ? ($items->whereNull('pagado_transportista_at')->isEmpty() && $items->isNotEmpty()
+                        ? $items->max('pagado_transportista_at')
+                        : null)
+                    : $envio->pagado_transportista_at;
+
                 return [
-                    'id'                     => $envio->id,
-                    'codigo'                 => $envio->codigo,
-                    'guia'                   => $envio->guia,
-                    'fecha'                  => $envio->fecha?->format('Y-m-d'),
-                    'cliente'                => $envio->cliente?->nombre,
-                    'monto'                  => (float) $envio->monto,
-                    'costo_transportista'    => $costoFlete,
-                    'estado'                 => $envio->estado ?? 'Registrado',
-                    'liquidado_at'           => $envio->liquidado_at?->format('Y-m-d H:i:s'),
-                    'pagado_transportista_at' => $envio->pagado_transportista_at?->format('Y-m-d H:i:s'),
-                    'items'                  => $envio->items->map(fn ($item) => [
-                        'id'                  => $item->id,
-                        'cantidad'            => $item->cantidad,
-                        'descripcion'         => $item->descripcion,
-                        'monto'               => $item->monto,
-                        'costo_transportista' => $item->costo_transportista,
+                    'id'                      => $envio->id,
+                    'codigo'                  => $envio->codigo,
+                    'guia'                    => $envio->guia,
+                    'fecha'                   => $envio->fecha?->format('Y-m-d'),
+                    'cliente'                 => $envio->cliente?->nombre,
+                    'monto'                   => (float) $envio->monto,
+                    'costo_transportista'     => $costoFlete,
+                    'costo_pendiente'         => $costoPendiente,
+                    'estado'                  => $envio->estado ?? 'Registrado',
+                    'liquidado_at'            => $envio->liquidado_at?->format('Y-m-d H:i:s'),
+                    'pagado_transportista_at' => $pagadoAt ? \Carbon\Carbon::parse($pagadoAt)->format('Y-m-d H:i:s') : null,
+                    'items'                   => $items->map(fn ($item) => [
+                        'id'                      => $item->id,
+                        'cantidad'                => $item->cantidad,
+                        'descripcion'             => $item->descripcion,
+                        'monto'                   => $item->monto,
+                        'costo_transportista'     => $item->costo_transportista,
+                        'pago_transportista_id'   => $item->pago_transportista_id,
+                        'pagado_transportista_at' => $item->pagado_transportista_at?->format('Y-m-d H:i:s'),
                     ])->values(),
                 ];
             });

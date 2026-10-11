@@ -248,6 +248,36 @@ function bindEvents() {
     on("#btn-liq-all", "click", liqAll);
     on("#btn-close-gestion", "click", closeGestion);
     on("#btn-liquidar-deuda", "click", liquidarDeudaTransportista);
+
+    on("#tab-carrier-pendientes", "click", () => switchCarrierTab("pendientes"));
+    on("#tab-carrier-historial", "click", () => switchCarrierTab("historial"));
+
+    on("#btn-carrier-pagos-prev", "click", () => {
+        if (carrierPagosCurrentPage > 1) {
+            cargarHistorialPagosCarrier(carrierPagosCurrentPage - 1);
+        }
+    });
+    on("#btn-carrier-pagos-next", "click", () => {
+        if (carrierPagosCurrentPage < carrierPagosLastPage) {
+            cargarHistorialPagosCarrier(carrierPagosCurrentPage + 1);
+        }
+    });
+
+    on("#btn-close-pago-detalle-modal", "click", () => {
+        const modal = $("#pago-detalle-modal");
+        if (modal) {
+            modal.classList.remove("is-active");
+            modal.setAttribute("aria-hidden", "true");
+        }
+    });
+    $("#pago-detalle-modal")?.addEventListener("click", (event) => {
+        if (event.target.id === "pago-detalle-modal") {
+            const modal = $("#pago-detalle-modal");
+            modal.classList.remove("is-active");
+            modal.setAttribute("aria-hidden", "true");
+        }
+    });
+
     on("#btn-export", "click", exportEnvios);
     on("#btn-clear-filters", "click", clearFilters);
     $("#envio-modal")?.addEventListener("click", (event) => {
@@ -1122,17 +1152,25 @@ async function openGestion(transportistaId) {
         const totalEnvios = state.gestionEnvios.length;
         const deudaTotal = state.gestionEnvios
             .filter(e => e.liquidado_at && !e.pagado_transportista_at)
-            .reduce((sum, e) => sum + Number(e.costo_transportista || 0), 0);
-        const liquidados = state.gestionEnvios.filter(e => e.pagado_transportista_at).length;
+            .reduce((sum, e) => sum + Number(e.costo_pendiente ?? e.costo_transportista ?? 0), 0);
+        const liquidados = state.gestionEnvios.filter(e => Boolean(e.pagado_transportista_at)).length;
 
         $("#gestion-envios-total").textContent = totalEnvios;
         $("#gestion-deuda-total").textContent = money(deudaTotal);
         $("#gestion-liquidados").textContent = liquidados;
 
+        const btnLiquidar = $("#btn-liquidar-deuda");
+        if (btnLiquidar) {
+            btnLiquidar.disabled = deudaTotal <= 0;
+            btnLiquidar.style.opacity = deudaTotal <= 0 ? "0.5" : "1";
+            btnLiquidar.style.cursor = deudaTotal <= 0 ? "not-allowed" : "pointer";
+        }
+
         renderGestionEnvios();
 
         $("#carrier-list-view").classList.add("hidden");
         $("#carrier-gestion-view").classList.remove("hidden");
+        switchCarrierTab("pendientes");
         window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
         showToast(error.message, "error");
@@ -1146,22 +1184,29 @@ function renderGestionEnvios() {
     const envios = state.gestionEnvios || [];
     const estados = ["Registrado", "En camino", "Entregado", "Devuelto"];
 
-    if (!envios.length) {
-        list.innerHTML = `<tr><td class="empty-state" colspan="8">Sin envíos registrados.</td></tr>`;
+    // Filtrar estrictamente por si no está pagado (sin importar si el costo es 0)
+    const enviosPendientes = envios.filter((e) => !e.pagado_transportista_at);
+
+    if (!enviosPendientes.length) {
+        list.innerHTML = `<tr><td class="empty-state" colspan="7" style="text-align:center; padding: 2.5rem 1rem; color: #94a3b8;">No hay envíos pendientes de abono para este transportista.</td></tr>`;
         return;
     }
 
-    list.innerHTML = envios.map((envio) => {
+    list.innerHTML = enviosPendientes.map((envio) => {
         const estadoOptions = estados.map(e => `<option value="${e}" ${e === envio.estado ? "selected" : ""}>${e}</option>`).join("");
         const liquidado = envio.liquidado_at ? `<span class="badge pagado">Sí</span>` : `<span class="badge contra">No</span>`;
-        const pagado = envio.pagado_transportista_at ? `<span class="badge pagado">Pagado</span>` : "";
         const itemsSummary = envio.items ? envio.items.map(i => `${i.cantidad}x ${escapeHtml(i.descripcion)}`).join('<br>') : '-';
+        const displayCosto = Number(envio.costo_pendiente ?? envio.costo_transportista ?? 0);
+
         return `
             <tr>
                 <td class="cell-code">${escapeHtml(envio.codigo)}</td>
                 <td class="cell-muted">${formatDate(envio.fecha)}</td>
                 <td class="cell-muted" style="font-size: 0.8rem;">${itemsSummary}</td>
-                <td class="cell-code">${money(envio.costo_transportista)}</td>
+                <td class="cell-code">
+                    ${money(displayCosto)}
+                    ${envio.costo_pendiente < envio.costo_transportista ? `<br><small style="color: #94a3b8; font-size: 0.75rem;">Total orig.: ${money(envio.costo_transportista)}</small>` : ""}
+                </td>
                 <td>
                     <select class="gestion-estado-select" data-envio-id="${envio.id}" style="padding: 0.25rem; font-size: 0.85rem; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #e2e8f0;">
                         ${estadoOptions}
@@ -1170,8 +1215,7 @@ function renderGestionEnvios() {
                 <td>${liquidado}</td>
                 <td>
                     <div class="row-actions">
-                        ${envio.liquidado_at && !envio.pagado_transportista_at ? `<button class="button button-primary" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;" data-gestion-pagar="${envio.id}" type="button">Pagar</button>` : ""}
-                        ${pagado}
+                        ${envio.liquidado_at ? `<button class="button button-primary" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;" data-gestion-pagar="${envio.id}" type="button">Pagar</button>` : `<span class="badge contra">No liquidado</span>`}
                     </div>
                 </td>
             </tr>
@@ -1193,8 +1237,10 @@ function renderGestionEnvios() {
     list.querySelectorAll("[data-gestion-pagar]").forEach((button) => {
         button.addEventListener("click", async () => {
             try {
-                await api.patch(`/envios/${button.dataset.gestionPagar}/pagar-transportista`);
-                showToast("Pago registrado.");
+                await api.patch(`/envios/${button.dataset.gestionPagar}/pagar-transportista`, {
+                    transportista_id: state.gestionTransportistaId
+                });
+                showToast("Pago registrado con éxito.");
                 openGestion(state.gestionTransportistaId);
             } catch (error) {
                 showToast(error.message, "error");
@@ -1203,11 +1249,171 @@ function renderGestionEnvios() {
     });
 }
 
+// ==========================================
+// AUDITORÍA Y HISTORIAL DE TRANSPORTISTAS
+// ==========================================
+let carrierPagosCurrentPage = 1;
+let carrierPagosLastPage = 1;
+
+function switchCarrierTab(tab) {
+    const btnPendientes = $("#tab-carrier-pendientes");
+    const btnHistorial = $("#tab-carrier-historial");
+    const contentPendientes = $("#carrier-tab-content-pendientes");
+    const contentHistorial = $("#carrier-tab-content-historial");
+
+    if (!btnPendientes || !btnHistorial) return;
+
+    if (tab === "pendientes") {
+        btnPendientes.classList.add("active");
+        btnPendientes.style.color = "#f8fafc";
+        btnPendientes.style.borderBottom = "2px solid #3b82f6";
+        btnPendientes.style.fontWeight = "600";
+
+        btnHistorial.classList.remove("active");
+        btnHistorial.style.color = "#94a3b8";
+        btnHistorial.style.borderBottom = "none";
+        btnHistorial.style.fontWeight = "500";
+
+        contentPendientes?.classList.remove("hidden");
+        contentHistorial?.classList.add("hidden");
+    } else {
+        btnHistorial.classList.add("active");
+        btnHistorial.style.color = "#f8fafc";
+        btnHistorial.style.borderBottom = "2px solid #3b82f6";
+        btnHistorial.style.fontWeight = "600";
+
+        btnPendientes.classList.remove("active");
+        btnPendientes.style.color = "#94a3b8";
+        btnPendientes.style.borderBottom = "none";
+        btnPendientes.style.fontWeight = "500";
+
+        contentPendientes?.classList.add("hidden");
+        contentHistorial?.classList.remove("hidden");
+
+        cargarHistorialPagosCarrier(1);
+    }
+}
+
+async function cargarHistorialPagosCarrier(page = 1) {
+    if (!state.gestionTransportistaId) return;
+
+    const list = $("#gestion-pagos-historial-list");
+    if (!list) return;
+
+    list.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 2rem; color: #94a3b8;">Cargando historial de pagos...</td></tr>`;
+
+    try {
+        const res = await fetch(`/api/transportistas/${state.gestionTransportistaId}/historial-pagos?page=${page}`, {
+            headers: {
+                "Accept": "application/json",
+                "X-Requested-With": "XMLHttpRequest",
+            }
+        });
+        const json = await res.json();
+
+        if (!json.ok) throw new Error(json.message || "Error al cargar historial");
+
+        const paginacion = json.data;
+        carrierPagosCurrentPage = paginacion.current_page;
+        carrierPagosLastPage = paginacion.last_page;
+
+        // Actualizar paginador
+        const totalText = $("#carrier-pagos-total-text");
+        if (totalText) {
+            totalText.textContent = `Página ${paginacion.current_page} de ${paginacion.last_page || 1} (${paginacion.total} pagos registrados)`;
+        }
+
+        const btnPrev = $("#btn-carrier-pagos-prev");
+        const btnNext = $("#btn-carrier-pagos-next");
+        if (btnPrev) btnPrev.disabled = !paginacion.prev_page_url;
+        if (btnNext) btnNext.disabled = !paginacion.next_page_url;
+
+        if (!paginacion.data.length) {
+            list.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 2rem; color: #94a3b8;">No se registran pagos previos para este transportista.</td></tr>`;
+            return;
+        }
+
+        list.innerHTML = paginacion.data.map(pago => {
+            const fechaStr = new Date(pago.fecha_pago).toLocaleString("es-PE", {
+                dateStyle: "short",
+                timeStyle: "short"
+            });
+            const totalItems = pago.items ? pago.items.length : 0;
+            const usuarioStr = pago.user ? pago.user.name : "Sistema";
+            const obsStr = pago.observacion ? pago.observacion : "-";
+
+            return `
+                <tr>
+                    <td><strong style="color: #38bdf8;">#${String(pago.id).padStart(5, '0')}</strong></td>
+                    <td>${fechaStr}</td>
+                    <td><strong style="color: #10b981;">${money(pago.monto_total)}</strong></td>
+                    <td>${totalItems} bultos / ítems</td>
+                    <td style="color: #cbd5e1; font-size: 0.85rem;">${obsStr}</td>
+                    <td><span style="color: #94a3b8; font-size: 0.85rem;">${usuarioStr}</span></td>
+                    <td style="text-align: right;">
+                        <button type="button" class="button button-small btn-ver-pago-items" data-pago='${JSON.stringify(pago).replace(/'/g, "&apos;")}'>
+                            Ver detalle
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join("");
+
+        // Eventos a botones de "Ver detalle"
+        list.querySelectorAll(".btn-ver-pago-items").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const pago = JSON.parse(btn.getAttribute("data-pago"));
+                abrirModalDetallePago(pago);
+            });
+        });
+
+    } catch (error) {
+        list.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 2rem; color: #ef4444;">${error.message}</td></tr>`;
+    }
+}
+
+function abrirModalDetallePago(pago) {
+    const modal = $("#pago-detalle-modal");
+    if (!modal) return;
+
+    $("#pago-detalle-title").textContent = `Recibo de Pago #${String(pago.id).padStart(5, '0')}`;
+    $("#pago-detalle-sub").textContent = new Date(pago.fecha_pago).toLocaleString("es-PE", {
+        dateStyle: "full",
+        timeStyle: "medium"
+    });
+    $("#pago-modal-monto").textContent = money(pago.monto_total);
+    $("#pago-modal-user").textContent = pago.user ? pago.user.name : "Sistema";
+
+    const tbody = $("#pago-detalle-items-list");
+    if (tbody) {
+        if (!pago.items || !pago.items.length) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #94a3b8; padding: 1rem;">No hay desglose de ítems para este registro.</td></tr>`;
+        } else {
+            tbody.innerHTML = pago.items.map(item => {
+                const guiaStr = item.envio ? (item.envio.guia || item.envio.codigo) : "S/G";
+                const clienteStr = item.envio?.cliente ? item.envio.cliente.nombre : "-";
+                return `
+                    <tr>
+                        <td><strong style="color: #38bdf8;">${guiaStr}</strong></td>
+                        <td>${clienteStr}</td>
+                        <td>${item.cantidad}x ${item.descripcion}</td>
+                        <td style="text-align: right; color: #10b981; font-weight: 600;">${money(item.costo_transportista)}</td>
+                    </tr>
+                `;
+            }).join("");
+        }
+    }
+
+    modal.classList.add("is-active");
+    modal.setAttribute("aria-hidden", "false");
+}
+
 function closeGestion() {
     $("#carrier-gestion-view").classList.add("hidden");
     $("#carrier-list-view").classList.remove("hidden");
     state.gestionTransportistaId = null;
     state.gestionEnvios = [];
+    switchCarrierTab("pendientes");
 }
 
 async function liquidarDeudaTransportista() {
@@ -1219,13 +1425,17 @@ async function liquidarDeudaTransportista() {
         return;
     }
 
-    const total = pendientes.reduce((sum, e) => sum + Number(e.costo_transportista || 0), 0);
+    const total = pendientes.reduce((sum, e) => sum + Number(e.costo_pendiente ?? e.costo_transportista ?? 0), 0);
     const confirmed = await showConfirmModal(`¿Liquidar ${pendientes.length} envío(s) por un total de ${money(total)}?`);
     if (!confirmed) return;
 
     try {
-        const response = await api.post("/envios/pagar-transportista-lote", { transportista_id: state.gestionTransportistaId });
-        showToast(`${response.data.pagados} envío(s) liquidado(s).`);
+        const response = await api.post("/envios/pagar-transportista-lote", { 
+            transportista_id: state.gestionTransportistaId,
+            observacion: "Liquidación total de fletes"
+        });
+        const itemsCount = response.data?.items_pagados ?? pendientes.length;
+        showToast(`Pago registrado exitosamente (${itemsCount} ítem(s) abonados).`);
         openGestion(state.gestionTransportistaId);
         loadManagementLists();
     } catch (error) {

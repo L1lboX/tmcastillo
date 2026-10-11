@@ -212,6 +212,11 @@ class AsignacionCargaController extends Controller
             $cantidadOriginal = (int) $itemOriginal->cantidad;
             $montoTotalOriginal = (float) ($itemOriginal->monto ?? 0);
             $costoTotalOriginal = (float) ($itemOriginal->costo_transportista ?? 0);
+            if ($costoTotalOriginal <= 0 && $itemOriginal->envio?->costo_transportista > 0) {
+                $envio = $itemOriginal->envio;
+                $totalCantidadEnvio = (int) $envio->items()->sum('cantidad') ?: $cantidadOriginal;
+                $costoTotalOriginal = round(((float) $envio->costo_transportista * $cantidadOriginal) / $totalCantidadEnvio, 2);
+            }
             $itemsCreados = [];
 
             $primeraCantidad = array_shift($cantidades);

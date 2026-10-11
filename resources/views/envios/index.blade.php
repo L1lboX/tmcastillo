@@ -224,28 +224,71 @@
                             </div>
                         </section>
 
-                        <section class="table-shell">
-                            <div class="table-scroll">
-                                <table>
-                                    <thead>
-                                    <tr>
-                                        <th>ID Envío</th>
-                                        <th>Fecha</th>
-                                        <th>Items</th>
-                                        <th>Costo</th>
-                                        <th>Estado</th>
-                                        <th>Liquidado</th>
-                                        <th>Acciones</th>
-                                    </tr>
-                                    </thead>
-                                    <tbody id="gestion-envios-list"></tbody>
-                                </table>
-                            </div>
-                        </section>
-
-                        <div style="margin-top: 1.5rem; text-align: right;">
-                            <button class="button button-primary button-with-icon icon-save" id="btn-liquidar-deuda" type="button">Liquidar deuda total</button>
+                        <div class="tabs-nav" style="display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 1px solid #334155; padding-bottom: 0.5rem;">
+                            <button type="button" class="button button-tab active" id="tab-carrier-pendientes" style="background: transparent; border: none; color: #f8fafc; font-weight: 600; padding: 0.5rem 1rem; cursor: pointer; border-bottom: 2px solid #3b82f6;">
+                                Pendientes de Abono
+                            </button>
+                            <button type="button" class="button button-tab" id="tab-carrier-historial" style="background: transparent; border: none; color: #94a3b8; font-weight: 500; padding: 0.5rem 1rem; cursor: pointer;">
+                                Historial de Pagos 
+                            </button>
                         </div>
+
+                        <!-- 3. Contenedor 1: Tabla de pendientes (envuelve la que ya tenías) -->
+                        <div id="carrier-tab-content-pendientes">
+                            <section class="table-shell">
+                                <div class="table-scroll">
+                                    <table>
+                                        <thead>
+                                        <tr>
+                                            <th>ID Envío</th>
+                                            <th>Fecha</th>
+                                            <th>Items</th>
+                                            <th>Costo</th>
+                                            <th>Estado</th>
+                                            <th>Liquidado</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody id="gestion-envios-list"></tbody>
+                                    </table>
+                                </div>
+                            </section>
+
+                            <div style="margin-top: 1.5rem; text-align: right;">
+                                <button class="button button-primary button-with-icon icon-save" id="btn-liquidar-deuda" type="button">Liquidar deuda total</button>
+                            </div>
+                        </div>
+
+                        <!-- 4. Contenedor 2: Tabla de historial auditado (nueva, oculta por defecto) -->
+                        <div id="carrier-tab-content-historial" class="hidden">
+                            <section class="table-shell">
+                                <div class="table-scroll">
+                                    <table>
+                                        <thead>
+                                        <tr>
+                                            <th>N° Recibo</th>
+                                            <th>Fecha y Hora</th>
+                                            <th>Monto Abonado</th>
+                                            <th>Bultos / Ítems</th>
+                                            <th>Observación</th>
+                                            <th>Autorizado por</th>
+                                            <th style="text-align: right;">Acciones</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody id="gestion-pagos-historial-list"></tbody>
+                                    </table>
+                                </div>
+                            </section>
+
+                            <div id="carrier-pagos-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; color: #94a3b8; font-size: 0.875rem;">
+                                <span id="carrier-pagos-total-text"></span>
+                                <div style="display: flex; gap: 0.5rem;">
+                                    <button type="button" class="button" id="btn-carrier-pagos-prev" disabled>Anterior</button>
+                                    <button type="button" class="button" id="btn-carrier-pagos-next" disabled>Siguiente</button>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </section>
 
@@ -527,6 +570,48 @@
                         </thead>
                         <tbody id="items-list"></tbody>
                     </table>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Modal de Desglose de Pago (Auditoría) -->
+    <div class="modal-backdrop" id="pago-detalle-modal" aria-hidden="true">
+        <section class="modal modal-medium" role="dialog" aria-modal="true" aria-labelledby="pago-detalle-title" style="max-width: 650px;">
+            <header class="modal-head">
+                <div>
+                    <h2 id="pago-detalle-title" style="margin: 0; font-size: 1.15rem;">Detalle de Pago</h2>
+                    <small id="pago-detalle-sub" style="color: #94a3b8;"></small>
+                </div>
+                <button class="button button-with-icon icon-close" id="btn-close-pago-detalle-modal" type="button">Cerrar</button>
+            </header>
+            <div class="modal-body">
+                <div style="background: #0f172a; border-radius: 6px; padding: 12px; margin-bottom: 1rem; border: 1px solid #334155; display: flex; justify-content: space-between;">
+                    <div>
+                        <span style="color: #94a3b8; font-size: 0.8rem; display: block;">Monto liquidado:</span>
+                        <strong id="pago-modal-monto" style="font-size: 1.25rem; color: #10b981;">S/ 0.00</strong>
+                    </div>
+                    <div>
+                        <span style="color: #94a3b8; font-size: 0.8rem; display: block;">Autorizado por:</span>
+                        <strong id="pago-modal-user" style="color: #f8fafc;">-</strong>
+                    </div>
+                </div>
+
+                <h4 style="margin-bottom: 0.5rem; font-size: 0.9rem; color: #cbd5e1;">Ítems y guías cubiertas en este corte:</h4>
+                <div class="table-shell">
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Guía / Código</th>
+                                    <th>Cliente</th>
+                                    <th>Descripción</th>
+                                    <th style="text-align: right;">Costo</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pago-detalle-items-list"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </section>

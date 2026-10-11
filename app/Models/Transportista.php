@@ -26,4 +26,8 @@ class Transportista extends Model
     {
         return $this->hasMany(EnvioItem::class);
     }
+    public function pagos(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(PagoTransportista::class);
+    }
 }

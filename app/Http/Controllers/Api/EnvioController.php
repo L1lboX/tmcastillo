@@ -13,6 +13,7 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use App\Models\PagoTransportista;
 
 class EnvioController extends Controller
 {
@@ -65,6 +66,8 @@ class EnvioController extends Controller
                     'cantidad' => (int) $item['cantidad'],
                     'descripcion' => trim($item['descripcion']),
                     'monto' => (float) ($item['monto'] ?? 0),
+                    'costo_transportista' => (float) ($item['costo_transportista'] ?? 0),
+                    'transportista_id'    => $item['transportista_id'] ?? null,
                 ]);
             }
 
@@ -91,6 +94,8 @@ class EnvioController extends Controller
                     'cantidad' => (int) $item['cantidad'],
                     'descripcion' => trim($item['descripcion']),
                     'monto' => (float) ($item['monto'] ?? 0),
+                    'costo_transportista' => (float) ($item['costo_transportista'] ?? 0),
+                    'transportista_id'    => $item['transportista_id'] ?? null,
                 ]);
             }
         });
@@ -114,22 +119,29 @@ class EnvioController extends Controller
         $monto = round((float) $validated['monto'], 2);
 
         DB::transaction(function () use ($envio, $validated, $monto): void {
-            $envio->update([
-                'pago' => $validated['pago'],
-                'monto' => $monto,
-                'liquidado_at' => now(),
-            ]);
+            $costoTotalFlete = 0.0;
 
             if (! empty($validated['items'])) {
                 foreach ($validated['items'] as $itemData) {
                     if (! empty($itemData['id'])) {
                         $item = $envio->items()->find($itemData['id']);
                         if ($item) {
-                            $item->update(['monto' => (float) ($itemData['monto'] ?? 0)]);
+                            $fleteItem = (float) ($itemData['monto'] ?? 0);
+                            $item->update([
+                                'costo_transportista' => $fleteItem,
+                            ]);
+                            $costoTotalFlete += $fleteItem;
                         }
                     }
                 }
             }
+
+            $envio->update([
+                'pago'                => $validated['pago'],
+                'monto'               => $monto,
+                'costo_transportista' => round($costoTotalFlete, 2),
+                'liquidado_at'        => now(),
+            ]);
 
             if ($validated['pago'] === 'Credito') {
                 $existe = CuentaCorriente::query()
@@ -194,25 +206,77 @@ class EnvioController extends Controller
         ]);
     }
 
-    public function pagarTransportista(Envio $envio): JsonResponse
+    public function pagarTransportista(Request $request, Envio $envio): JsonResponse
     {
-        if ($envio->pagado_transportista_at) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'envio' => 'Este envío ya fue pagado al transportista.',
-            ]);
-        }
-
         if (! $envio->liquidado_at) {
             throw \Illuminate\Validation\ValidationException::withMessages([
                 'envio' => 'El envío debe ser liquidado antes de pagar al transportista.',
             ]);
         }
 
-        $envio->update(['pagado_transportista_at' => now()]);
+        $transportistaId = $request->input('transportista_id') ?? $envio->transportista_id;
+
+        // Obtener ítems pendientes para este transportista en este envío
+        $itemsQuery = $envio->items()->whereNull('pagado_transportista_at');
+        if ($transportistaId) {
+            $itemsQuery->where('transportista_id', $transportistaId);
+        }
+        $itemsPendientes = $itemsQuery->get();
+
+        // Si no tiene ítems fraccionados pero tiene transportista a nivel cabecera
+        if ($itemsPendientes->isEmpty() && $envio->items()->count() === 0) {
+            if ($envio->pagado_transportista_at) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'envio' => 'Este envío ya fue pagado al transportista.',
+                ]);
+            }
+        } elseif ($itemsPendientes->isEmpty()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'envio' => 'Todos los ítems de este transportista en este envío ya fueron pagados.',
+            ]);
+        }
+
+        $resultado = DB::transaction(function () use ($envio, $itemsPendientes, $transportistaId, $request) {
+            $montoTotal = $itemsPendientes->isNotEmpty()
+                ? round((float) $itemsPendientes->sum('costo_transportista'), 2)
+                : round((float) ($envio->costo_transportista ?? 0), 2);
+
+            // 1. Crear el recibo de auditoría
+            $pago = PagoTransportista::create([
+                'transportista_id' => $transportistaId,
+                'user_id'          => $request->user()?->id,
+                'monto_total'      => $montoTotal,
+                'observacion'      => "Abono individual Envío {$envio->codigo}",
+                'fecha_pago'       => now(),
+            ]);
+
+            // 2. Marcar los ítems
+            if ($itemsPendientes->isNotEmpty()) {
+                EnvioItem::whereIn('id', $itemsPendientes->pluck('id'))->update([
+                    'pago_transportista_id'   => $pago->id,
+                    'pagado_transportista_at' => now(),
+                ]);
+            }
+
+            // 3. Evaluar si el envío ya no tiene ítems pendientes con ningún fletero
+            $tienePendientesGlobal = $envio->items()
+                ->where('costo_transportista', '>', 0)
+                ->whereNull('pagado_transportista_at')
+                ->exists();
+
+            if (! $tienePendientesGlobal) {
+                $envio->update(['pagado_transportista_at' => now()]);
+            }
+
+            return $pago;
+        });
 
         return response()->json([
-            'ok' => true,
-            'data' => $this->format($envio->refresh()->load(['cliente', 'transportista', 'items'])),
+            'ok'   => true,
+            'data' => [
+                'pago'  => $resultado,
+                'envio' => $this->format($envio->refresh()->load(['cliente', 'transportista', 'items'])),
+            ],
         ]);
     }
 
@@ -220,26 +284,68 @@ class EnvioController extends Controller
     {
         $validated = $request->validate([
             'transportista_id' => ['required', 'integer', 'exists:transportistas,id'],
+            'observacion'      => ['nullable', 'string', 'max:255'],
         ]);
 
-        $envioIds = EnvioItem::query()
-            ->join('envios', 'envio_items.envio_id', '=', 'envios.id')
-            ->where('envio_items.transportista_id', $validated['transportista_id'])
-            ->whereNotNull('envios.liquidado_at')
-            ->whereNull('envios.pagado_transportista_at')
-            ->pluck('envios.id')
-            ->unique();
+        $resultado = DB::transaction(function () use ($validated, $request) {
+            // 1. Obtener los ítems pendientes de pago de este transportista en envíos ya liquidados
+            $itemsPendientes = EnvioItem::query()
+                ->join('envios', 'envio_items.envio_id', '=', 'envios.id')
+                ->where('envio_items.transportista_id', $validated['transportista_id'])
+                ->whereNotNull('envios.liquidado_at')
+                ->whereNull('envio_items.pagado_transportista_at')
+                ->select('envio_items.*')
+                ->get();
 
-        $count = 0;
-        if ($envioIds->isNotEmpty()) {
-            $count = Envio::query()
-                ->whereIn('id', $envioIds)
-                ->update(['pagado_transportista_at' => now()]);
-        }
+            if ($itemsPendientes->isEmpty()) {
+                return [
+                    'pago'             => null,
+                    'items_pagados'    => 0,
+                    'envios_afectados' => 0,
+                ];
+            }
+
+            // 2. Calcular el total del abono
+            $montoTotal = round((float) $itemsPendientes->sum('costo_transportista'), 2);
+
+            // 3. Crear el registro maestro de auditoría
+            $pago = PagoTransportista::create([
+                'transportista_id' => $validated['transportista_id'],
+                'user_id'          => $request->user()?->id,
+                'monto_total'      => $montoTotal,
+                'observacion'      => $validated['observacion'] ?? null,
+                'fecha_pago'       => now(),
+            ]);
+
+            // 4. Marcar los ítems con el ID del pago y la fecha
+            $itemIds = $itemsPendientes->pluck('id');
+            EnvioItem::whereIn('id', $itemIds)->update([
+                'pago_transportista_id'   => $pago->id,
+                'pagado_transportista_at' => now(),
+            ]);
+
+            // 5. Para compatibilidad, si todos los ítems de un envío quedaron pagados, marcar la cabecera
+            $envioIds = $itemsPendientes->pluck('envio_id')->unique();
+            foreach ($envioIds as $envioId) {
+                $tienePendientes = EnvioItem::where('envio_id', $envioId)
+                    ->whereNull('pagado_transportista_at')
+                    ->exists();
+
+                if (! $tienePendientes) {
+                    Envio::where('id', $envioId)->update(['pagado_transportista_at' => now()]);
+                }
+            }
+
+            return [
+                'pago'             => $pago,
+                'items_pagados'    => $itemsPendientes->count(),
+                'envios_afectados' => $envioIds->count(),
+            ];
+        });
 
         return response()->json([
-            'ok' => true,
-            'data' => ['pagados' => $count],
+            'ok'   => true,
+            'data' => $resultado,
         ]);
     }
 

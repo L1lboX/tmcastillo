@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\DashboardController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\AuditoriaPagoController;
 
 Route::get('/', function () {
     return view('public.index');
@@ -147,6 +148,9 @@ Route::middleware('auth')->prefix('api')->group(function (): void {
         ->middleware('permission:envios.create');
     Route::post('/asignacion-carga/merge', [AsignacionCargaController::class, 'mergeItems'])
     ->middleware('permission:envios.create');
+
+    Route::get('/auditoria/transportistas', [AuditoriaPagoController::class, 'index']);
+    Route::get('/transportistas/{transportista}/historial-pagos', [AuditoriaPagoController::class, 'porTransportista']);
 
     
 
