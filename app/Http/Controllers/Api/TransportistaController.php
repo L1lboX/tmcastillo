@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers\Api;
-
+use App\Models\EnvioItem;
 use App\Http\Controllers\Controller;
 use App\Models\Envio;
 use App\Models\Transportista;
@@ -117,31 +117,38 @@ class TransportistaController extends Controller
         $transportistas = Transportista::query()
             ->get()
             ->map(function (Transportista $t) {
-                $enviosTotal = Envio::query()
+                // Envíos totales donde este transportista tiene al menos un ítem asignado
+                $enviosTotal = EnvioItem::query()
                     ->where('transportista_id', $t->id)
-                    ->count();
+                    ->distinct('envio_id')
+                    ->count('envio_id');
 
-                $deudaPendiente = Envio::query()
-                    ->where('transportista_id', $t->id)
-                    ->whereNotNull('liquidado_at')
-                    ->whereNull('pagado_transportista_at')
-                    ->sum('costo_transportista');
+                // Flete pendiente por abonar de ítems asignados en envíos ya liquidados
+                $deudaPendiente = EnvioItem::query()
+                    ->join('envios', 'envio_items.envio_id', '=', 'envios.id')
+                    ->where('envio_items.transportista_id', $t->id)
+                    ->whereNotNull('envios.liquidado_at')
+                    ->whereNull('envios.pagado_transportista_at')
+                    ->sum('envio_items.costo_transportista');
 
-                $liquidados = Envio::query()
-                    ->where('transportista_id', $t->id)
-                    ->whereNotNull('pagado_transportista_at')
-                    ->count();
+                // Envíos ya saldados
+                $liquidados = EnvioItem::query()
+                    ->join('envios', 'envio_items.envio_id', '=', 'envios.id')
+                    ->where('envio_items.transportista_id', $t->id)
+                    ->whereNotNull('envios.pagado_transportista_at')
+                    ->distinct('envio_id')
+                    ->count('envio_id');
 
                 return [
-                    'id' => $t->id,
-                    'envios_total' => $enviosTotal,
+                    'id'              => $t->id,
+                    'envios_total'    => $enviosTotal,
                     'deuda_pendiente' => round((float) $deudaPendiente, 2),
-                    'liquidados' => $liquidados,
+                    'liquidados'      => $liquidados,
                 ];
             });
 
         return response()->json([
-            'ok' => true,
+            'ok'   => true,
             'data' => $transportistas->keyBy('id'),
         ]);
     }
@@ -149,30 +156,62 @@ class TransportistaController extends Controller
     public function envios(Transportista $transportista): JsonResponse
     {
         $envios = Envio::query()
-            ->with(['cliente', 'items'])
-            ->where('transportista_id', $transportista->id)
+            ->with(['cliente', 'items' => function ($q) use ($transportista) {
+                $q->where('transportista_id', $transportista->id);
+            }])
+            ->where(function ($q) use ($transportista) {
+                $q->where('transportista_id', $transportista->id)
+                  ->orWhereHas('items', fn ($sub) => $sub->where('transportista_id', $transportista->id));
+            })
             ->latest('id')
             ->get()
-            ->map(fn (Envio $envio) => [
-                'id' => $envio->id,
-                'codigo' => $envio->codigo,
-                'fecha' => $envio->fecha?->format('Y-m-d'),
-                'cliente' => $envio->cliente?->nombre,
-                'items' => $envio->items->map(fn ($item) => [
-                    'id' => $item->id,
-                    'cantidad' => $item->cantidad,
-                    'descripcion' => $item->descripcion,
-                    'monto' => $item->monto,
-                ])->values(),
-                'costo_transportista' => $envio->costo_transportista,
-                'estado' => $envio->estado ?? 'Registrado',
-                'liquidado_at' => $envio->liquidado_at?->format('Y-m-d H:i:s'),
-                'pagado_transportista_at' => $envio->pagado_transportista_at?->format('Y-m-d H:i:s'),
-            ]);
+            ->map(function (Envio $envio) use ($transportista) {
+                // El costo que le corresponde a este transportista en este envío
+                $costoFlete = $envio->items->isNotEmpty()
+                    ? (float) $envio->items->sum('costo_transportista')
+                    : (float) ($envio->costo_transportista ?? 0);
+
+                return [
+                    'id'                     => $envio->id,
+                    'codigo'                 => $envio->codigo,
+                    'guia'                   => $envio->guia,
+                    'fecha'                  => $envio->fecha?->format('Y-m-d'),
+                    'cliente'                => $envio->cliente?->nombre,
+                    'monto'                  => (float) $envio->monto,
+                    'costo_transportista'    => $costoFlete,
+                    'estado'                 => $envio->estado ?? 'Registrado',
+                    'liquidado_at'           => $envio->liquidado_at?->format('Y-m-d H:i:s'),
+                    'pagado_transportista_at' => $envio->pagado_transportista_at?->format('Y-m-d H:i:s'),
+                    'items'                  => $envio->items->map(fn ($item) => [
+                        'id'                  => $item->id,
+                        'cantidad'            => $item->cantidad,
+                        'descripcion'         => $item->descripcion,
+                        'monto'               => $item->monto,
+                        'costo_transportista' => $item->costo_transportista,
+                    ])->values(),
+                ];
+            });
 
         return response()->json([
-            'ok' => true,
+            'ok'   => true,
             'data' => $envios,
+        ]);
+    }
+
+    public function liquidacionSemanal($transportistaId, Request $request)
+    {
+        $fechaInicio = $request->query('fecha_inicio', now()->startOfWeek()->toDateString());
+        $fechaFin    = $request->query('fecha_fin', now()->endOfWeek()->toDateString());
+
+        $totalAPagarSemana = EnvioItem::where('transportista_id', $transportistaId)
+            ->whereHas('envio', function ($query) use ($fechaInicio, $fechaFin) {
+                $query->whereBetween('fecha', [$fechaInicio, $fechaFin]);
+            })
+            ->sum('costo_transportista');
+
+        return response()->json([
+            'transportista_id' => $transportistaId,
+            'total_a_pagar'    => $totalAPagarSemana,
         ]);
     }
 }

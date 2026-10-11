@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\CuentaCorriente;
 use App\Models\Envio;
+use App\Models\EnvioItem;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -221,11 +222,20 @@ class EnvioController extends Controller
             'transportista_id' => ['required', 'integer', 'exists:transportistas,id'],
         ]);
 
-        $count = Envio::query()
-            ->where('transportista_id', $validated['transportista_id'])
-            ->whereNotNull('liquidado_at')
-            ->whereNull('pagado_transportista_at')
-            ->update(['pagado_transportista_at' => now()]);
+        $envioIds = EnvioItem::query()
+            ->join('envios', 'envio_items.envio_id', '=', 'envios.id')
+            ->where('envio_items.transportista_id', $validated['transportista_id'])
+            ->whereNotNull('envios.liquidado_at')
+            ->whereNull('envios.pagado_transportista_at')
+            ->pluck('envios.id')
+            ->unique();
+
+        $count = 0;
+        if ($envioIds->isNotEmpty()) {
+            $count = Envio::query()
+                ->whereIn('id', $envioIds)
+                ->update(['pagado_transportista_at' => now()]);
+        }
 
         return response()->json([
             'ok' => true,
@@ -236,32 +246,39 @@ class EnvioController extends Controller
     public function transportistasConDeuda(): JsonResponse
     {
         $transportistas = \App\Models\Transportista::query()
-            ->withCount(['envios as envios_pendientes' => function ($query) {
-                $query->whereNotNull('liquidado_at')
-                    ->whereNull('pagado_transportista_at');
-            }])
             ->get()
             ->map(function ($transportista) {
-                $deudaTotal = Envio::query()
-                    ->where('transportista_id', $transportista->id)
-                    ->whereNotNull('liquidado_at')
-                    ->whereNull('pagado_transportista_at')
-                    ->sum('costo_transportista');
+                // Cantidad de envíos liquidados pendientes de pago para este transportista
+                $enviosPendientes = EnvioItem::query()
+                    ->join('envios', 'envio_items.envio_id', '=', 'envios.id')
+                    ->where('envio_items.transportista_id', $transportista->id)
+                    ->whereNotNull('envios.liquidado_at')
+                    ->whereNull('envios.pagado_transportista_at')
+                    ->distinct('envios.id')
+                    ->count('envios.id');
+
+                // Suma del flete pendiente de sus ítems
+                $deudaTotal = EnvioItem::query()
+                    ->join('envios', 'envio_items.envio_id', '=', 'envios.id')
+                    ->where('envio_items.transportista_id', $transportista->id)
+                    ->whereNotNull('envios.liquidado_at')
+                    ->whereNull('envios.pagado_transportista_at')
+                    ->sum('envio_items.costo_transportista');
 
                 return [
-                    'id' => $transportista->id,
-                    'nombre' => $transportista->nombre,
-                    'documento' => $transportista->documento,
-                    'telefono' => $transportista->telefono,
-                    'envios_pendientes' => $transportista->envios_pendientes,
-                    'deuda_total' => round((float) $deudaTotal, 2),
+                    'id'                => $transportista->id,
+                    'nombre'            => $transportista->nombre,
+                    'documento'         => $transportista->documento,
+                    'telefono'          => $transportista->telefono,
+                    'envios_pendientes' => $enviosPendientes,
+                    'deuda_total'       => round((float) $deudaTotal, 2),
                 ];
             })
-            ->filter(fn ($t) => $t['envios_pendientes'] > 0)
+            ->filter(fn ($t) => $t['envios_pendientes'] > 0 && $t['deuda_total'] > 0)
             ->values();
 
         return response()->json([
-            'ok' => true,
+            'ok'   => true,
             'data' => $transportistas,
         ]);
     }
@@ -269,16 +286,33 @@ class EnvioController extends Controller
     public function enviosPendientesTransportista(int $transportistaId): JsonResponse
     {
         $envios = Envio::query()
-            ->with(['cliente', 'items'])
-            ->where('transportista_id', $transportistaId)
+            ->with(['cliente', 'items' => function ($q) use ($transportistaId) {
+                $q->where('transportista_id', $transportistaId);
+            }])
+            ->whereHas('items', function ($q) use ($transportistaId) {
+                $q->where('transportista_id', $transportistaId);
+            })
             ->whereNotNull('liquidado_at')
             ->whereNull('pagado_transportista_at')
             ->latest('id')
             ->get()
-            ->map(fn (Envio $envio) => $this->format($envio));
+            ->map(function (Envio $envio) use ($transportistaId) {
+                $costoFlete = (float) $envio->items->sum('costo_transportista');
+
+                return [
+                    'id'                  => $envio->id,
+                    'codigo'              => $envio->codigo,
+                    'guia'                => $envio->guia,
+                    'fecha'               => $envio->fecha?->format('Y-m-d'),
+                    'cliente'             => $envio->cliente?->nombre,
+                    'monto'               => (float) $envio->monto,
+                    'costo_transportista' => $costoFlete,
+                    'items'               => $envio->items,
+                ];
+            });
 
         return response()->json([
-            'ok' => true,
+            'ok'   => true,
             'data' => $envios,
         ]);
     }

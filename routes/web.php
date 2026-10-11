@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\TransportistaController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\Api\DashboardController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -125,6 +126,9 @@ Route::middleware('auth')->prefix('api')->group(function (): void {
     Route::patch('/transportistas/{transportista}/toggle', [TransportistaController::class, 'toggleActive'])
         ->middleware('permission:transportistas.manage');
 
+    Route::get('/dashboard/ganancias', [DashboardController::class, 'ganancias'])
+        ->middleware('permission:envios.amounts');
+
     Route::get('/asignacion-carga', [AsignacionCargaController::class, 'index'])
         ->middleware('permission:envios.create');
     Route::get('/asignacion-carga/{envio}', [AsignacionCargaController::class, 'show'])
@@ -143,6 +147,8 @@ Route::middleware('auth')->prefix('api')->group(function (): void {
         ->middleware('permission:envios.create');
     Route::post('/asignacion-carga/merge', [AsignacionCargaController::class, 'mergeItems'])
     ->middleware('permission:envios.create');
+
+    
 
     Route::middleware('permission:users.manage')->group(function (): void {
         Route::get('/users', [UserController::class, 'index']);

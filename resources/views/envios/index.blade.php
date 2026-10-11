@@ -321,10 +321,114 @@
                 </section>
 
                 <section class="module-page{{ auth()->user()->cannot('dashboard.view') ? ' hidden' : '' }}" data-page="dashboard">
-                    <section class="placeholder-module">
-                        <h1>Dashboard</h1>
-                        <p>Módulo reservado para indicadores, ganancias y análisis por rol.</p>
-                    </section>
+                        <!-- Encabezado y Filtro de Fechas -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+                        <div>
+                            <h2 style="margin: 0; font-size: 1.5rem; color: var(--text); font-weight: 700; font-family: 'Outfit', sans-serif;">
+                                Panel de Control Ejecutivo
+                            </h2>
+                            <span style="color: var(--muted); font-size: 0.88rem;">
+                                Indicadores financieros, liquidez y riesgo operativo
+                            </span>
+                        </div>
+
+                        <div style="display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--line); padding: 8px 14px; border-radius: 8px;">
+                            <select id="dash-preset" style="background: transparent; border: none; color: var(--text); font-weight: 600; font-size: 0.88rem; outline: none; cursor: pointer;">
+                                <option value="semana_actual" style="background: var(--panel);">Semana Actual</option>
+                                <option value="semana_anterior" style="background: var(--panel);">Semana Anterior</option>
+                                <option value="mes_actual" style="background: var(--panel);">Mes Actual</option>
+                                <option value="personalizado" style="background: var(--panel);">Rango Personalizado</option>
+                            </select>
+
+                            <div id="dash-custom-dates" style="display: none; align-items: center; gap: 8px;">
+                                <input type="date" id="dash-fecha-desde" style="background: var(--panel-soft); border: 1px solid var(--line); color: var(--text); border-radius: 6px; padding: 4px 8px; font-size: 0.82rem;">
+                                <span style="color: var(--muted); font-size: 0.82rem;">al</span>
+                                <input type="date" id="dash-fecha-hasta" style="background: var(--panel-soft); border: 1px solid var(--line); color: var(--text); border-radius: 6px; padding: 4px 8px; font-size: 0.82rem;">
+                                <button id="dash-btn-filtrar" type="button" class="button" style="background: var(--accent); color: var(--bg-deep); border: none; padding: 4px 12px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.82rem;">
+                                    Consultar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Franja 1: KPIs Ejecutivos Principales -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                        <div style="background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px;">
+                            <span style="color: var(--muted); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Facturación Bruta</span>
+                            <div id="kpi-ingresos" style="font-size: 1.65rem; font-weight: 700; color: var(--text); margin-top: 6px; font-family: 'Outfit', sans-serif;">S/ 0.00</div>
+                            <div id="kpi-volumen" style="font-size: 0.8rem; color: var(--faint); margin-top: 4px;">0 despachos</div>
+                        </div>
+
+                        <div style="background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px;">
+                            <span style="color: var(--muted); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Costo de Fletes</span>
+                            <div id="kpi-costos" style="font-size: 1.65rem; font-weight: 700; color: var(--danger); margin-top: 6px; font-family: 'Outfit', sans-serif;">S/ 0.00</div>
+                            <div style="font-size: 0.8rem; color: var(--faint); margin-top: 4px;">Pago a transportistas</div>
+                        </div>
+
+                        <div style="background: var(--panel); border: 1px solid rgba(74, 222, 128, 0.3); border-radius: 10px; padding: 18px;">
+                            <span style="color: var(--success); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Utilidad Operativa</span>
+                            <div id="kpi-utilidad" style="font-size: 1.65rem; font-weight: 700; color: var(--success); margin-top: 6px; font-family: 'Outfit', sans-serif;">S/ 0.00</div>
+                            <div style="font-size: 0.8rem; color: var(--muted); margin-top: 4px;">Margen bruto neto</div>
+                        </div>
+
+                        <div style="background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px;">
+                            <span style="color: var(--muted); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Margen Comercial</span>
+                            <div id="kpi-margen" style="font-size: 1.65rem; font-weight: 700; color: var(--accent); margin-top: 6px; font-family: 'Outfit', sans-serif;">0.00%</div>
+                            <div style="font-size: 0.8rem; color: var(--faint); margin-top: 4px;">Rentabilidad sobre venta</div>
+                        </div>
+                    </div>
+
+                    <!-- Franja 2: Gráfica de Tendencia Financiera -->
+                    <div style="background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px; margin-bottom: 24px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                            <div>
+                                <h3 style="margin: 0; font-size: 1.05rem; color: var(--text); font-family: 'Outfit', sans-serif;">Evolución Diaria: Ingresos vs. Fletes</h3>
+                                <span id="dash-chart-subtitle" style="font-size: 0.8rem; color: var(--muted);">Comparativo de rendimiento operativo</span>
+                            </div>
+                        </div>
+                        <div style="position: relative; height: 300px; width: 100%;">
+                            <canvas id="dash-chart-canvas"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Franja 3: Top 5 Cuentas Clave (Riesgo y Liquidez) -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 18px;">
+                        
+                        <!-- Top 5 Clientes Deudores -->
+                        <div style="background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: flex; flex-direction: column;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid var(--line); padding-bottom: 10px;">
+                                <div>
+                                    <h3 style="margin: 0; font-size: 1rem; color: var(--text); font-family: 'Outfit', sans-serif;">Top 5 Clientes por Cobrar</h3>
+                                    <span style="font-size: 0.78rem; color: var(--muted);">Mayor volumen de deuda pendiente</span>
+                                </div>
+                                <span style="font-size: 0.75rem; color: var(--danger); font-weight: 700; background: rgba(239, 100, 100, 0.12); padding: 3px 8px; border-radius: 4px;">
+                                    Cuentas Activas
+                                </span>
+                            </div>
+                            
+                            <div id="dash-top-clientes-body" style="display: flex; flex-direction: column; gap: 8px;">
+                                <div style="text-align: center; padding: 20px; color: var(--muted); font-size: 0.85rem;">Consultando saldos...</div>
+                            </div>
+                        </div>
+
+                        <!-- Top 5 Transportistas Pendientes de Pago -->
+                        <div style="background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: flex; flex-direction: column;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid var(--line); padding-bottom: 10px;">
+                                <div>
+                                    <h3 style="margin: 0; font-size: 1rem; color: var(--text); font-family: 'Outfit', sans-serif;">Top 5 Transportistas por Liquidar</h3>
+                                    <span style="font-size: 0.78rem; color: var(--muted);">Compromisos de flete pendientes</span>
+                                </div>
+                                <span style="font-size: 0.75rem; color: var(--accent); font-weight: 700; background: var(--accent-soft); padding: 3px 8px; border-radius: 4px;">
+                                    Fletes Pendientes
+                                </span>
+                            </div>
+                            
+                            <div id="dash-top-transportistas-body" style="display: flex; flex-direction: column; gap: 8px;">
+                                <div style="text-align: center; padding: 20px; color: var(--muted); font-size: 0.85rem;">Consultando fletes...</div>
+                            </div>
+                        </div>
+
+                    </div>
                 </section>
 
                 <section class="module-page hidden" data-page="roles">

@@ -173,6 +173,7 @@ class AsignacionCargaController extends Controller
             'cantidad' => $item->cantidad,
             'descripcion' => $item->descripcion,
             'monto' => $item->monto,
+            'costo_transportista' => $item->costo_transportista,
             'transportista_id' => $item->transportista_id,
             'transportista' => $item->transportista?->nombre,
         ];
@@ -210,20 +211,26 @@ class AsignacionCargaController extends Controller
         $itemsResultantes = DB::transaction(function () use ($itemOriginal, $cantidades) {
             $cantidadOriginal = (int) $itemOriginal->cantidad;
             $montoTotalOriginal = (float) ($itemOriginal->monto ?? 0);
+            $costoTotalOriginal = (float) ($itemOriginal->costo_transportista ?? 0);
             $itemsCreados = [];
 
             $primeraCantidad = array_shift($cantidades);
             $primerMonto = $cantidadOriginal > 0 
                 ? round(($montoTotalOriginal * $primeraCantidad) / $cantidadOriginal, 2) 
                 : 0.00;
+            $primerCosto = $cantidadOriginal > 0
+                ? round(($costoTotalOriginal * $primeraCantidad) / $cantidadOriginal, 2)
+                : 0.00;
 
             $itemOriginal->update([
                 'cantidad' => $primeraCantidad,
                 'monto' => $primerMonto,
+                'costo_transportista' => $primerCosto,
             ]);
             $itemsCreados[] = $itemOriginal->fresh(['transportista']);
 
             $montoAcumulado = $primerMonto;
+            $costoAcumulado = $primerCosto;
             $totalPartesRestantes = count($cantidades);
 
             foreach ($cantidades as $index => $cant) {
@@ -231,19 +238,26 @@ class AsignacionCargaController extends Controller
 
                 if ($esUltimo) {
                     $montoFraccion = round($montoTotalOriginal - $montoAcumulado, 2);
+                    $costoFraccion = round($costoTotalOriginal - $costoAcumulado, 2);
                 } else {
                     $montoFraccion = $cantidadOriginal > 0 
                         ? round(($montoTotalOriginal * $cant) / $cantidadOriginal, 2) 
                         : 0.00;
+                    $costoFraccion = $cantidadOriginal > 0
+                        ? round(($costoTotalOriginal * $cant) / $cantidadOriginal, 2)
+                        : 0.00;
+
                     $montoAcumulado += $montoFraccion;
+                    $costoAcumulado += $costoFraccion;
                 }
 
                 $nuevoItem = EnvioItem::create([
                     'envio_id' => $itemOriginal->envio_id,
                     'transportista_id' => $itemOriginal->transportista_id,
-                    'descripcion' => $itemOriginal->descripcion,
                     'cantidad' => $cant,
-                    'monto' => max(0, $montoFraccion),
+                    'descripcion' => $itemOriginal->descripcion,
+                    'monto' => $montoFraccion,
+                    'costo_transportista' => $costoFraccion,
                 ]);
 
                 $itemsCreados[] = $nuevoItem->fresh(['transportista']);
@@ -253,8 +267,9 @@ class AsignacionCargaController extends Controller
         });
 
         return response()->json([
-            'message' => 'Ítem dividido exitosamente.',
-            'items' => collect($itemsResultantes)->map(fn (EnvioItem $i) => $this->formatItem($i))->values(),
+            'ok' => true,
+            'message' => 'Ítem fraccionado correctamente.',
+            'items' => collect($itemsResultantes)->map(fn ($it) => $this->formatItem($it)),
         ]);
     }
 
@@ -286,6 +301,7 @@ class AsignacionCargaController extends Controller
             $destino->update([
                 'cantidad' => (int) $destino->cantidad + (int) $origen->cantidad,
                 'monto' => round((float) $destino->monto + (float) $origen->monto, 2),
+                'costo_transportista' => round((float) $destino->costo_transportista + (float) $origen->costo_transportista, 2),
             ]);
 
             $origen->delete();

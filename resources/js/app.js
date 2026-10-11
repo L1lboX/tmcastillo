@@ -1,3 +1,4 @@
+import Chart from 'chart.js/auto';  
 const state = {
     envios: [],
     users: [],
@@ -367,6 +368,9 @@ function showSection(section) {
     }
     if (section === "cuentas") {
         loadDebtClients();
+    }
+    if (section === "dashboard") {
+        loadDashboardGanancias();
     }
     if (section === "usuarios") {
         loadUsers();
@@ -2434,4 +2438,214 @@ function errorMessage(payload) {
         if (first) return first;
     }
     return "No se pudo completar la solicitud.";
+}
+
+let dashboardChartInstance = null;
+
+async function loadDashboardGanancias() {
+    const presetSelect = document.getElementById("dash-preset");
+    const customDates = document.getElementById("dash-custom-dates");
+    const fechaDesdeInput = document.getElementById("dash-fecha-desde");
+    const fechaHastaInput = document.getElementById("dash-fecha-hasta");
+    const btnFiltrar = document.getElementById("dash-btn-filtrar");
+
+    if (!presetSelect) return;
+
+    if (!presetSelect.dataset.listenerAttached) {
+        presetSelect.dataset.listenerAttached = "true";
+        presetSelect.addEventListener("change", () => {
+            const isCustom = presetSelect.value === "personalizado";
+            if (customDates) customDates.style.display = isCustom ? "flex" : "none";
+            if (!isCustom) {
+                loadDashboardGanancias();
+            }
+        });
+
+        btnFiltrar?.addEventListener("click", () => {
+            loadDashboardGanancias();
+        });
+    }
+
+    const preset = presetSelect.value;
+    const params = new URLSearchParams({ preset });
+
+    if (preset === "personalizado") {
+        if (fechaDesdeInput?.value) params.append("fecha_desde", fechaDesdeInput.value);
+        if (fechaHastaInput?.value) params.append("fecha_hasta", fechaHastaInput.value);
+    }
+
+    try {
+        const res = await fetch(`/api/dashboard/ganancias?${params.toString()}`, {
+            headers: {
+                "Accept": "application/json",
+                "X-Requested-With": "XMLHttpRequest",
+            },
+        });
+
+        if (!res.ok) throw new Error("Error al obtener indicadores");
+
+        const data = await res.json();
+        const kpi = data.kpis;
+        const sol = (n) => "S/ " + Number(n).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        // Actualizar KPIs
+        const elIngresos = document.getElementById("kpi-ingresos");
+        const elVolumen = document.getElementById("kpi-volumen");
+        const elCostos = document.getElementById("kpi-costos");
+        const elUtilidad = document.getElementById("kpi-utilidad");
+        const elMargen = document.getElementById("kpi-margen");
+
+        if (elIngresos) elIngresos.textContent = sol(kpi.ingresos);
+        if (elVolumen) elVolumen.textContent = `${kpi.total_envios} despachos`;
+        if (elCostos) elCostos.textContent = sol(kpi.fletes);
+        if (elUtilidad) elUtilidad.textContent = sol(kpi.utilidad);
+        if (elMargen) elMargen.textContent = `${kpi.margen_pct}%`;
+
+        // Renderizar Top 5 Clientes Deudores
+        const topCliBody = document.getElementById("dash-top-clientes-body");
+        if (topCliBody) {
+            if (!data.top_deudores || data.top_deudores.length === 0) {
+                topCliBody.innerHTML = `<div style="text-align:center; padding:18px; color:var(--muted); font-size:0.85rem;">Sin deudas pendientes registradas.</div>`;
+            } else {
+                topCliBody.innerHTML = data.top_deudores.map((c, index) => `
+                    <div style="display: flex; justify-content: space-between; align-items: center; background: var(--panel-soft); border: 1px solid var(--line); padding: 10px 14px; border-radius: 8px;">
+                        <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                            <span style="font-size: 0.75rem; font-weight: 700; color: var(--muted); background: var(--panel-strong); width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 50%;">
+                                ${index + 1}
+                            </span>
+                            <div style="display: flex; flex-direction: column; min-width: 0;">
+                                <strong style="color: var(--text); font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                    ${c.cliente}
+                                </strong>
+                                <span style="color: var(--faint); font-size: 0.76rem;">
+                                    ${c.envios_pendientes} ${c.envios_pendientes === 1 ? 'envío pendiente' : 'envíos pendientes'}
+                                </span>
+                            </div>
+                        </div>
+                        <div style="text-align: right; margin-left: 12px; flex-shrink: 0;">
+                            <div style="color: var(--danger); font-weight: 700; font-size: 0.95rem; font-family: 'Outfit', sans-serif;">
+                                ${sol(c.deuda_total)}
+                            </div>
+                        </div>
+                    </div>
+                `).join("");
+            }
+        }
+
+        // Renderizar Top 5 Transportistas por Liquidar
+        const topTransBody = document.getElementById("dash-top-transportistas-body");
+        if (topTransBody) {
+            if (!data.top_transportistas || data.top_transportistas.length === 0) {
+                topTransBody.innerHTML = `<div style="text-align:center; padding:18px; color:var(--muted); font-size:0.85rem;">Sin saldos pendientes de flete.</div>`;
+            } else {
+                topTransBody.innerHTML = data.top_transportistas.map((t, index) => `
+                    <div style="display: flex; justify-content: space-between; align-items: center; background: var(--panel-soft); border: 1px solid var(--line); padding: 10px 14px; border-radius: 8px;">
+                        <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                            <span style="font-size: 0.75rem; font-weight: 700; color: var(--muted); background: var(--panel-strong); width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 50%;">
+                                ${index + 1}
+                            </span>
+                            <div style="display: flex; flex-direction: column; min-width: 0;">
+                                <strong style="color: var(--text); font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                    ${t.transportista}
+                                </strong>
+                                <span style="color: var(--faint); font-size: 0.76rem;">
+                                    ${t.viajes_pendientes} ${t.viajes_pendientes === 1 ? 'viaje por liquidar' : 'viajes por liquidar'}
+                                </span>
+                            </div>
+                        </div>
+                        <div style="text-align: right; margin-left: 12px; flex-shrink: 0;">
+                            <div style="color: var(--accent); font-weight: 700; font-size: 0.95rem; font-family: 'Outfit', sans-serif;">
+                                ${sol(t.total_pendiente)}
+                            </div>
+                        </div>
+                    </div>
+                `).join("");
+            }
+        }
+
+        // Gráfico Chart.js
+        const ctx = document.getElementById("dash-chart-canvas");
+        if (ctx && data.chart) {
+            if (dashboardChartInstance) {
+                dashboardChartInstance.destroy();
+            }
+
+            dashboardChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.chart.labels,
+                    datasets: [
+                        {
+                            label: 'Ingresos (S/)',
+                            data: data.chart.ingresos,
+                            backgroundColor: 'rgba(96, 165, 250, 0.75)',
+                            borderColor: '#60a5fa',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                            order: 2,
+                        },
+                        {
+                            label: 'Costo Fletes (S/)',
+                            data: data.chart.fletes,
+                            backgroundColor: 'rgba(239, 100, 100, 0.75)',
+                            borderColor: '#ef6464',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                            order: 2,
+                        },
+                        {
+                            label: 'Margen Neto (S/)',
+                            data: data.chart.ganancia,
+                            type: 'line',
+                            borderColor: '#c5a043',
+                            backgroundColor: '#c5a043',
+                            borderWidth: 2,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#c5a043',
+                            fill: false,
+                            tension: 0.3,
+                            order: 1,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#94a3b8',
+                                font: { family: 'Inter', size: 12 }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#101827',
+                            titleColor: '#eef2f7',
+                            bodyColor: '#eef2f7',
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                            borderWidth: 1,
+                            padding: 10,
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#94a3b8', font: { family: 'Inter', size: 11 } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: {
+                                color: '#94a3b8',
+                                font: { family: 'Inter', size: 11 },
+                                callback: (val) => 'S/ ' + val
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+    } catch (err) {
+        console.error("Error al cargar dashboard ejecutivo:", err);
+    }
 }
