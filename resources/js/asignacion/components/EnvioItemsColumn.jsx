@@ -1,7 +1,7 @@
 import { useDroppable } from '@dnd-kit/core';
 import { ItemCard } from './ItemCard';
 
-export function EnvioItemsColumn({ envio, items }) {
+export function EnvioItemsColumn({ envio, items, onSplitClick, onMergeClick }) {
     const { setNodeRef, isOver } = useDroppable({
         id: 'unassigned',
         data: { type: 'unassigned' },
@@ -18,14 +18,24 @@ export function EnvioItemsColumn({ envio, items }) {
                 </div>
                 <span className="kanban-column-count">{sinAsignar.length}</span>
             </header>
-            <div ref={setNodeRef} className="kanban-column-body">
+            <div 
+                ref={setNodeRef} 
+                className="kanban-column-body"
+                style={{ minHeight: '300px', display: 'flex', flexDirection: 'column', gap: '8px' }}
+            >
                 {sinAsignar.length === 0 ? (
                     <div className="kanban-column-empty">
                         Todos los items están asignados
                     </div>
                 ) : (
                     sinAsignar.map((item) => (
-                        <ItemCard key={item.id} item={item} envio={envio} />
+                        <ItemCard 
+                            key={item.id} 
+                            item={item} 
+                            envio={envio} 
+                            onSplitClick={onSplitClick} 
+                            onMergeClick={onMergeClick} 
+                        />
                     ))
                 )}
             </div>

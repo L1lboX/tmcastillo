@@ -1,7 +1,7 @@
 import { useDroppable } from '@dnd-kit/core';
 import { ItemCard } from './ItemCard';
 
-export function TransportistaColumn({ transportista, items, envio, onAsignarTodos, onQuitar }) {
+export function TransportistaColumn({ transportista, items, envio, onAsignarTodos, onQuitar, onSplitClick, onMergeClick }) {
     const { setNodeRef, isOver } = useDroppable({
         id: `transportista-${transportista.id}`,
         data: { type: 'transportista', transportista },
@@ -38,7 +38,7 @@ export function TransportistaColumn({ transportista, items, envio, onAsignarTodo
                     </div>
                 ) : (
                     items.map((item) => (
-                        <ItemCard key={item.id} item={item} envio={envio} />
+                        <ItemCard key={item.id} item={item} envio={envio} onSplitClick={onSplitClick} onMergeClick={onMergeClick}/>
                     ))
                 )}
             </div>

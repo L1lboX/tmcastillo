@@ -130,8 +130,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     bindEvents();
     setToday();
-    if (can("dashboard.view")) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialSection = urlParams.get("section") || window.location.hash.replace("#", "");
+
+    if (initialSection) {
+        showSection(initialSection);
+    } else if (can("dashboard.view")) {
         showSection("dashboard");
+    } else {
+        showSection("envios");
     }
     loadEnvios();
     if (can("clientes.manage") || can("transportistas.manage") || can("envios.create")) {

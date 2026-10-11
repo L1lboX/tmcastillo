@@ -57,9 +57,23 @@ export function useAsignacion() {
         try {
             setLoading(true);
             const data = await api.get(`/api/asignacion-carga/${envioId}`);
-            setEnvioActivo(data.envio);
-            setTransportistasDisponibles(data.transportistas);
-            setColumnasActivas([]);
+            const envio = data.envio;
+            const transportistas = data.transportistas || [];
+
+            const assignedTransIds = [
+                ...new Set(
+                    (envio.items || [])
+                        .map((i) => i.transportista_id)
+                        .filter(Boolean)
+                ),
+            ];
+
+            const columnasIniciales = transportistas.filter((t) =>
+                assignedTransIds.includes(t.id)
+            );
+            setEnvioActivo(envio);
+            setTransportistasDisponibles(transportistas);
+            setColumnasActivas(columnasIniciales);
             setView('kanban');
             setError(null);
         } catch (err) {
@@ -112,11 +126,25 @@ export function useAsignacion() {
         if (!envioActivo) return;
         try {
             const data = await api.get(`/api/asignacion-carga/${envioActivo.id}`);
-            setEnvioActivo(data.envio);
+            const envio = data.envio;
+            setEnvioActivo(envio);
+
+            const assignedTransIds = (envio.items || [])
+                .map((i) => i.transportista_id)
+                .filter(Boolean);
+
+            setColumnasActivas((prev) => {
+                const prevIds = prev.map((t) => t.id);
+                const nuevos = transportistasDisponibles.filter(
+                    (t) => assignedTransIds.includes(t.id) && !prevIds.includes(t.id)
+                );
+                return [...prev, ...nuevos];
+            });
+
         } catch (err) {
             showToast(err.message, 'error');
         }
-    }, [envioActivo, showToast]);
+    }, [envioActivo, transportistasDisponibles, showToast]);
 
     const asignarItem = useCallback(async (itemId, transportistaId) => {
         try {
@@ -168,6 +196,37 @@ export function useAsignacion() {
         }
     }, [envioActivo, showToast, reloadEnvio]);
 
+
+    const splitItem = useCallback(async (itemId, cantidades) => {
+        try {
+            const data = await api.post('/api/asignacion-carga/split', {
+                item_id: itemId,
+                cantidades: cantidades,
+            });
+            showToast(data.message || 'Carga dividida con éxito');
+            await reloadEnvio();
+            return true;
+        } catch (err) {
+            showToast(err.message, 'error');
+            throw err;
+        }
+    }, [showToast, reloadEnvio]);
+
+    const mergeItems = useCallback(async (itemOrigenId, itemDestinoId) => {
+        try {
+            const data = await api.post('/api/asignacion-carga/merge', {
+                item_id_origen: itemOrigenId,
+                item_id_destino: itemDestinoId,
+            });
+            showToast(data.message || 'Cargas consolidadas exitosamente');
+            await reloadEnvio();
+            return true;
+        } catch (err) {
+            showToast(err.message, 'error');
+            throw err;
+        }
+    }, [showToast, reloadEnvio]);
+
     return {
         enviosPendientes,
         envioActivo,
@@ -185,5 +244,7 @@ export function useAsignacion() {
         asignarItem,
         desasignarItem,
         asignarTodosATransportista,
+        splitItem,
+        mergeItems,
     };
 }

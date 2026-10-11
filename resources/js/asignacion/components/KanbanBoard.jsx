@@ -4,6 +4,7 @@ import { TransportistaColumn } from './TransportistaColumn';
 import { EnvioItemsColumn } from './EnvioItemsColumn';
 import { TransportistaSearch } from './TransportistaSearch';
 import { ItemCard } from './ItemCard';
+import { SplitItemModal } from './SplitItemModal';
 
 export function KanbanBoard({
     envio,
@@ -14,9 +15,12 @@ export function KanbanBoard({
     onAsignarItem,
     onDesasignarItem,
     onAsignarTodos,
+    onSplitItem,
+    onMergeItems,
     onVolver,
 }) {
     const [activeItem, setActiveItem] = useState(null);
+    const [splittingItem, setSplittingItem] = useState(null);
 
     function getItemsByTransportista(transportistaId) {
         return envio.items.filter((item) => item.transportista_id === transportistaId);
@@ -37,19 +41,52 @@ export function KanbanBoard({
         const dragData = active.data.current;
         const dropData = over.data.current;
 
-        if (dragData.type !== 'item') return;
+       if (dragData?.type !== 'item') return;
 
-        const item = dragData.item;
+        const itemOrigen = dragData.item;
 
-        if (dropData.type === 'transportista') {
-            if (item.transportista_id !== dropData.transportista.id) {
-                await onAsignarItem(item.id, dropData.transportista.id);
+        if (dropData?.type === 'item') {
+            const itemDestino = dropData.item;
+
+           if (itemOrigen && itemDestino && itemOrigen.id !== itemDestino.id) {
+                const descOrigen = (itemOrigen.descripcion || '').trim().toLowerCase();
+                const descDestino = (itemDestino.descripcion || '').trim().toLowerCase();
+
+                if (descOrigen === descDestino && typeof onMergeItems === 'function') {
+                    await onMergeItems(itemOrigen.id, itemDestino.id);
+                    return;
+                }
+
+                if (!itemDestino.transportista_id && itemOrigen.transportista_id) {
+                    await onDesasignarItem(itemOrigen.id);
+                    return;
+                }
+
+                if (itemDestino.transportista_id && itemOrigen.transportista_id !== itemDestino.transportista_id) {
+                    await onAsignarItem(itemOrigen.id, itemDestino.transportista_id);
+                    return;
+                }
             }
-        } else if (dropData.type === 'unassigned') {
-            if (item.transportista_id) {
-                await onDesasignarItem(item.id);
-            }
+            return;
         }
+
+        if (dropData?.type === 'transportista') {
+            if (itemOrigen.transportista_id !== dropData.transportista.id) {
+                await onAsignarItem(itemOrigen.id, dropData.transportista.id);
+            }
+            return;
+        }
+        
+        if (dropData?.type === 'unassigned') {
+            if (itemOrigen.transportista_id) {
+                await onDesasignarItem(itemOrigen.id);
+            }
+            return;
+        }
+    }
+
+    function handleOpenSplit(item, itemEnvio) {
+        setSplittingItem({ item, envio: itemEnvio || envio });
     }
 
     return (
@@ -73,7 +110,12 @@ export function KanbanBoard({
             </div>
 
             <div className="kanban-board">
-                <EnvioItemsColumn envio={envio} items={envio.items} />
+                <EnvioItemsColumn 
+                    envio={envio} 
+                    items={envio.items}
+                    onSplitClick={handleOpenSplit}
+                    onMergeClick={onMergeItems}
+                />
                 {columnasActivas.map((t) => (
                     <TransportistaColumn
                         key={t.id}
@@ -82,6 +124,8 @@ export function KanbanBoard({
                         envio={envio}
                         onAsignarTodos={() => onAsignarTodos(t.id)}
                         onQuitar={() => onQuitarTransportista(t.id)}
+                        onSplitClick={handleOpenSplit}
+                        onMergeClick={onMergeItems}
                     />
                 ))}
             </div>
@@ -91,6 +135,17 @@ export function KanbanBoard({
                     <ItemCard item={activeItem.item} envio={activeItem.envio} />
                 )}
             </DragOverlay>
+
+            {splittingItem && (
+                <SplitItemModal
+                    isOpen={true}
+                    item={splittingItem.item}
+                    envio={splittingItem.envio}
+                    onClose={() => setSplittingItem(null)}
+                    onConfirm={onSplitItem}
+                />
+            )}
+            
         </DndContext>
     );
 }

@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
+
 class AsignacionCargaController extends Controller
 {
     public function index(Request $request): JsonResponse
@@ -186,5 +187,112 @@ class AsignacionCargaController extends Controller
             'telefono' => $t->telefono,
             'tipos' => $t->tipos ?? [],
         ];
+    }
+
+    public function splitItem(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'item_id' => 'required|integer|exists:envio_items,id',
+            'cantidades' => 'required|array|min:2',
+            'cantidades.*' => 'required|integer|min:1',
+        ]);
+
+        $itemOriginal = EnvioItem::findOrFail($validated['item_id']);
+        $cantidades = array_map('intval', $validated['cantidades']);
+        $totalPartes = array_sum($cantidades);
+
+        if ($totalPartes !== (int) $itemOriginal->cantidad) {
+            return response()->json([
+                'message' => "La suma de las partes ({$totalPartes}) no coincide con la cantidad actual del ítem ({$itemOriginal->cantidad}).",
+            ], 422);
+        }
+
+        $itemsResultantes = DB::transaction(function () use ($itemOriginal, $cantidades) {
+            $cantidadOriginal = (int) $itemOriginal->cantidad;
+            $montoTotalOriginal = (float) ($itemOriginal->monto ?? 0);
+            $itemsCreados = [];
+
+            $primeraCantidad = array_shift($cantidades);
+            $primerMonto = $cantidadOriginal > 0 
+                ? round(($montoTotalOriginal * $primeraCantidad) / $cantidadOriginal, 2) 
+                : 0.00;
+
+            $itemOriginal->update([
+                'cantidad' => $primeraCantidad,
+                'monto' => $primerMonto,
+            ]);
+            $itemsCreados[] = $itemOriginal->fresh(['transportista']);
+
+            $montoAcumulado = $primerMonto;
+            $totalPartesRestantes = count($cantidades);
+
+            foreach ($cantidades as $index => $cant) {
+                $esUltimo = ($index === $totalPartesRestantes - 1);
+
+                if ($esUltimo) {
+                    $montoFraccion = round($montoTotalOriginal - $montoAcumulado, 2);
+                } else {
+                    $montoFraccion = $cantidadOriginal > 0 
+                        ? round(($montoTotalOriginal * $cant) / $cantidadOriginal, 2) 
+                        : 0.00;
+                    $montoAcumulado += $montoFraccion;
+                }
+
+                $nuevoItem = EnvioItem::create([
+                    'envio_id' => $itemOriginal->envio_id,
+                    'transportista_id' => $itemOriginal->transportista_id,
+                    'descripcion' => $itemOriginal->descripcion,
+                    'cantidad' => $cant,
+                    'monto' => max(0, $montoFraccion),
+                ]);
+
+                $itemsCreados[] = $nuevoItem->fresh(['transportista']);
+            }
+
+            return $itemsCreados;
+        });
+
+        return response()->json([
+            'message' => 'Ítem dividido exitosamente.',
+            'items' => collect($itemsResultantes)->map(fn (EnvioItem $i) => $this->formatItem($i))->values(),
+        ]);
+    }
+
+
+    public function mergeItems(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'item_id_origen' => 'required|integer|exists:envio_items,id',
+            'item_id_destino' => 'required|integer|exists:envio_items,id',
+        ]);
+
+        if ($validated['item_id_origen'] === $validated['item_id_destino']) {
+            return response()->json(['message' => 'No puedes fusionar un ítem consigo mismo.'], 422);
+        }
+
+        $origen = EnvioItem::findOrFail($validated['item_id_origen']);
+        $destino = EnvioItem::findOrFail($validated['item_id_destino']);
+
+        $descOrigen = trim(mb_strtolower($origen->descripcion));
+        $descDestino = trim(mb_strtolower($destino->descripcion));
+
+        if ($origen->envio_id !== $destino->envio_id || $descOrigen !== $descDestino) {
+            return response()->json([
+                'message' => 'Los ítems deben pertenecer al mismo envío y tener la misma descripción.',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($origen, $destino) {
+            $destino->update([
+                'cantidad' => (int) $destino->cantidad + (int) $origen->cantidad,
+                'monto' => round((float) $destino->monto + (float) $origen->monto, 2),
+            ]);
+
+            $origen->delete();
+        });
+
+        return response()->json([
+            'message' => 'Ítems fusionados exitosamente.',
+        ]);
     }
 }

@@ -139,6 +139,10 @@ Route::middleware('auth')->prefix('api')->group(function (): void {
         ->middleware('permission:envios.create');
     Route::post('/asignacion-carga/envio', [AsignacionCargaController::class, 'asignarEnvio'])
         ->middleware('permission:envios.create');
+    Route::post('/asignacion-carga/split', [AsignacionCargaController::class, 'splitItem'])
+        ->middleware('permission:envios.create');
+    Route::post('/asignacion-carga/merge', [AsignacionCargaController::class, 'mergeItems'])
+    ->middleware('permission:envios.create');
 
     Route::middleware('permission:users.manage')->group(function (): void {
         Route::get('/users', [UserController::class, 'index']);

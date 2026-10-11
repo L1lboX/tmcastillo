@@ -21,6 +21,8 @@ export function App() {
         asignarItem,
         desasignarItem,
         asignarTodosATransportista,
+        splitItem,
+        mergeItems,
     } = useAsignacion();
 
     useEffect(() => {
@@ -72,6 +74,8 @@ export function App() {
                     onAsignarItem={asignarItem}
                     onDesasignarItem={desasignarItem}
                     onAsignarTodos={asignarTodosATransportista}
+                    onSplitItem={splitItem}
+                    onMergeItems={mergeItems}
                     onVolver={volverALista}
                 />
             ) : (

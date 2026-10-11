@@ -9,6 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('envios', function (Blueprint $table) {
+            $table->dropForeign(['cliente_id']);
             $table->unsignedBigInteger('cliente_id')->nullable()->change();
             $table->foreign('cliente_id')->references('id')->on('clientes')->nullOnDelete();
         });
