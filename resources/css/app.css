@@ -26,14 +26,14 @@
 
 html {
     width: 100%;
-    overflow-x: hidden;
+    overflow-x: clip;
 }
 
 body {
     margin: 0;
     min-height: 100vh;
     width: 100%;
-    overflow-x: hidden;
+    overflow-x: clip;
     background:
         radial-gradient(circle at 22% -12%, rgba(197, 160, 67, .12), transparent 28%),
         radial-gradient(circle at 88% 12%, rgba(59, 130, 246, .10), transparent 32%),
@@ -225,9 +225,14 @@ textarea {
     position: sticky;
     top: 0;
     height: 100vh;
+    max-height: 100vh;
     padding: 20px 14px;
+    align-self: start;
     display: flex;
     flex-direction: column;
+    justify-content: space-between;
+    overflow-y: auto;
+    z-index: 40;
     background:
         linear-gradient(180deg, rgba(255, 255, 255, .045), transparent 38%),
         linear-gradient(180deg, #101827 0%, #080d1a 58%, #030712 100%);
@@ -290,6 +295,18 @@ textarea {
     margin-top: 16px;
     flex: 1;
     align-content: start;
+    overflow-y: auto;
+}
+
+.sidebar::-webkit-scrollbar,
+.sidebar-nav::-webkit-scrollbar {
+    width: 4px;
+}
+
+.sidebar::-webkit-scrollbar-thumb,
+.sidebar-nav::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
 }
 
 .sidebar-group {

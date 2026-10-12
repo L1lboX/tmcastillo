@@ -10,24 +10,42 @@ use Illuminate\Http\Request;
 
 class TransportistaController extends Controller
 {
-    public function index(Request $request): JsonResponse
+   public function index(Request $request): JsonResponse
     {
-        $term = trim((string) $request->query('search', ''));
+        $term       = trim((string) $request->query('search', ''));
         $activeOnly = $request->boolean('active_only');
         $tipoFilter = trim((string) $request->query('tipo', ''));
+        $perPage    = max(1, (int) $request->query('per_page', 15));
 
-        $transportistas = Transportista::query()
+        $query = Transportista::query()
             ->when($activeOnly, fn ($q) => $q->where('activo', true))
             ->when($tipoFilter !== '', fn ($q) => $q->whereJsonContains('tipos', $tipoFilter))
-            ->when($term !== '', function ($query) use ($term): void {
-                $query->where('nombre', 'like', "%{$term}%")
-                    ->orWhere('documento', 'like', "%{$term}%");
+            ->when($term !== '', function ($q) use ($term): void {
+                $q->where(function ($sub) use ($term) {
+                    $sub->where('nombre', 'like', "%{$term}%")
+                        ->orWhere('documento', 'like', "%{$term}%")
+                        ->orWhere('telefono', 'like', "%{$term}%");
+                });
             })
-            ->orderBy($term === '' ? 'created_at' : 'nombre', $term === '' ? 'desc' : 'asc')
-            ->limit($term === '' ? 10 : 20)
-            ->get();
+            ->orderBy($term === '' ? 'created_at' : 'nombre', $term === '' ? 'desc' : 'asc');
 
-        return response()->json(['ok' => true, 'data' => $transportistas]);
+        // Para selects, modales de asignación rápida o reportes que requieran la lista completa
+        if ($request->boolean('all')) {
+            return response()->json(['ok' => true, 'data' => $query->get()]);
+        }
+
+        $paginado = $query->paginate($perPage);
+
+        return response()->json([
+            'ok'   => true,
+            'data' => $paginado->items(),
+            'meta' => [
+                'current_page' => $paginado->currentPage(),
+                'last_page'    => $paginado->lastPage(),
+                'per_page'     => $paginado->perPage(),
+                'total'        => $paginado->total(),
+            ],
+        ]);
     }
 
     public function show(Transportista $transportista): JsonResponse
@@ -86,14 +104,15 @@ class TransportistaController extends Controller
 
     public function destroy(Transportista $transportista): JsonResponse
     {
-        $pendientes = $transportista->envios()
+        $pendientes = EnvioItem::query()
+            ->where('transportista_id', $transportista->id)
             ->where('costo_transportista', '>', 0)
-            ->whereNull('liquidado_at')
+            ->whereNull('pagado_transportista_at')
             ->count();
 
         if ($pendientes > 0) {
             throw \Illuminate\Validation\ValidationException::withMessages([
-                'transportista' => "No se puede eliminar. El transportista tiene {$pendientes} envío(s) pendiente(s) de liquidar.",
+                'transportista' => "No se puede eliminar. El transportista tiene {$pendientes} ítem(s) de flete pendiente(s) de pago.",
             ]);
         }
 
@@ -102,40 +121,28 @@ class TransportistaController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    public function toggleActive(Transportista $transportista): JsonResponse
-    {
-        $transportista->update(['activo' => !$transportista->activo]);
-
-        return response()->json([
-            'ok' => true,
-            'data' => $transportista->fresh(),
-        ]);
-    }
-
     public function metrics(): JsonResponse
     {
         $transportistas = Transportista::query()
             ->get()
             ->map(function (Transportista $t) {
-                // Envíos totales donde este transportista tiene al menos un ítem asignado
+                // 1. Envíos totales donde este transportista tiene al menos un ítem asignado
                 $enviosTotal = EnvioItem::query()
                     ->where('transportista_id', $t->id)
                     ->distinct('envio_id')
                     ->count('envio_id');
 
-                // Flete pendiente por abonar de ítems asignados en envíos ya liquidados
+                // 2. Flete pendiente real: items asignados con costo mayor a 0 que aún no han sido pagados
                 $deudaPendiente = EnvioItem::query()
-                    ->join('envios', 'envio_items.envio_id', '=', 'envios.id')
-                    ->where('envio_items.transportista_id', $t->id)
-                    ->whereNotNull('envios.liquidado_at')
-                    ->whereNull('envios.pagado_transportista_at')
-                    ->sum('envio_items.costo_transportista');
+                    ->where('transportista_id', $t->id)
+                    ->where('costo_transportista', '>', 0)
+                    ->whereNull('pagado_transportista_at')
+                    ->sum('costo_transportista');
 
-                // Envíos ya saldados
+                // 3. Envíos donde sus ítems ya fueron saldados al chofer
                 $liquidados = EnvioItem::query()
-                    ->join('envios', 'envio_items.envio_id', '=', 'envios.id')
-                    ->where('envio_items.transportista_id', $t->id)
-                    ->whereNotNull('envios.pagado_transportista_at')
+                    ->where('transportista_id', $t->id)
+                    ->whereNotNull('pagado_transportista_at')
                     ->distinct('envio_id')
                     ->count('envio_id');
 

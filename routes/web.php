@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuditoriaPagoController;
+use App\Http\Controllers\Api\AuditoriaCobroController;
 
 Route::get('/', function () {
     return view('public.index');
@@ -126,6 +127,15 @@ Route::middleware('auth')->prefix('api')->group(function (): void {
         ->middleware('permission:transportistas.delete');
     Route::patch('/transportistas/{transportista}/toggle', [TransportistaController::class, 'toggleActive'])
         ->middleware('permission:transportistas.manage');
+
+    Route::get('/auditoria/transportistas', [AuditoriaPagoController::class, 'index']);
+    Route::get('/auditoria/cobros', [AuditoriaCobroController::class, 'index']);
+    Route::get('/transportistas/{transportista}/historial-pagos', [AuditoriaPagoController::class, 'porTransportista']);
+    Route::get('/auditoria/transportistas/buscar-rapido', [AuditoriaPagoController::class, 'autocompletarChoferes']);
+    Route::get('/auditoria/clientes/buscar-rapido', [AuditoriaCobroController::class, 'autocompletarClientes']);
+
+    Route::get('auditoria/transportistas/export', [AuditoriaPagoController::class, 'export']);  
+    Route::get('auditoria/cobros/export', [AuditoriaCobroController::class, 'export']);
 
     Route::get('/dashboard/ganancias', [DashboardController::class, 'ganancias'])
         ->middleware('permission:envios.amounts');

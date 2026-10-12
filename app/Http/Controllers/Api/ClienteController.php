@@ -12,20 +12,37 @@ class ClienteController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $term = trim((string) $request->query('search', ''));
+        $term    = trim((string) $request->query('search', ''));
+        $perPage = max(1, (int) $request->query('per_page', 15));
 
-        $clientes = Cliente::query()
-            ->when($term !== '', function ($query) use ($term): void {
-                $query->where('dni', 'like', "%{$term}%")
-                    ->orWhere('nombre', 'like', "%{$term}%");
+        $query = Cliente::query()
+            ->when($term !== '', function ($q) use ($term): void {
+                $q->where(function ($sub) use ($term) {
+                    $sub->where('dni', 'like', "%{$term}%")
+                        ->orWhere('nombre', 'like', "%{$term}%")
+                        ->orWhere('telefono', 'like', "%{$term}%");
+                });
             })
-            ->orderBy($term === '' ? 'created_at' : 'nombre', $term === '' ? 'desc' : 'asc')
-            ->limit($term === '' ? 10 : 20)
-            ->get();
+            ->orderBy($term === '' ? 'created_at' : 'nombre', $term === '' ? 'desc' : 'asc');
 
-        return response()->json(['ok' => true, 'data' => $clientes]);
+        // Para selects o asignaciones rápidas que requieran la lista completa
+        if ($request->boolean('all')) {
+            return response()->json(['ok' => true, 'data' => $query->get()]);
+        }
+
+        $paginado = $query->paginate($perPage);
+
+        return response()->json([
+            'ok'   => true,
+            'data' => $paginado->items(),
+            'meta' => [
+                'current_page' => $paginado->currentPage(),
+                'last_page'    => $paginado->lastPage(),
+                'per_page'     => $paginado->perPage(),
+                'total'        => $paginado->total(),
+            ],
+        ]);
     }
-
     public function show(Cliente $cliente): JsonResponse
     {
         return response()->json(['ok' => true, 'data' => $cliente]);

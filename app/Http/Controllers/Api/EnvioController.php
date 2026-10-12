@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CuentaCorriente;
 use App\Models\Envio;
 use App\Models\EnvioItem;
+use App\Models\PagoTransportista;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,7 +14,6 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
-use App\Models\PagoTransportista;
 
 class EnvioController extends Controller
 {
@@ -63,9 +63,9 @@ class EnvioController extends Controller
 
             foreach ($request->input('items', []) as $item) {
                 $envio->items()->create([
-                    'cantidad' => (int) $item['cantidad'],
-                    'descripcion' => trim($item['descripcion']),
-                    'monto' => (float) ($item['monto'] ?? 0),
+                    'cantidad'            => (int) $item['cantidad'],
+                    'descripcion'         => trim($item['descripcion']),
+                    'monto'               => (float) ($item['monto'] ?? 0),
                     'costo_transportista' => (float) ($item['costo_transportista'] ?? 0),
                     'transportista_id'    => $item['transportista_id'] ?? null,
                 ]);
@@ -88,15 +88,47 @@ class EnvioController extends Controller
             $data['cliente_id'] = (int) ($request->input('cliente_id') ?: $cliente->id);
             $envio->update($data);
 
-            $envio->items()->delete();
-            foreach ($request->input('items', []) as $item) {
-                $envio->items()->create([
-                    'cantidad' => (int) $item['cantidad'],
-                    'descripcion' => trim($item['descripcion']),
-                    'monto' => (float) ($item['monto'] ?? 0),
-                    'costo_transportista' => (float) ($item['costo_transportista'] ?? 0),
-                    'transportista_id'    => $item['transportista_id'] ?? null,
-                ]);
+            $itemsRecibidos = $request->input('items', []);
+            $itemsExistentes = $envio->items->keyBy('id');
+
+            if (! empty($itemsRecibidos)) {
+                $idsParaConservar = [];
+
+                foreach ($itemsRecibidos as $itemData) {
+                    $itemId = $itemData['id'] ?? null;
+                    $itemExistente = $itemId ? $itemsExistentes->get($itemId) : null;
+
+                    // Preservar flete y chofer si el request no los especifica expresamente
+                    $costoTransportista = isset($itemData['costo_transportista']) && $itemData['costo_transportista'] !== ''
+                        ? (float) $itemData['costo_transportista']
+                        : ($itemExistente?->costo_transportista ?? 0.0);
+
+                    $transportistaId = ! empty($itemData['transportista_id'])
+                        ? $itemData['transportista_id']
+                        : ($itemExistente?->transportista_id ?? null);
+
+                    if ($itemExistente) {
+                        $itemExistente->update([
+                            'cantidad'            => (int) $itemData['cantidad'],
+                            'descripcion'         => trim($itemData['descripcion']),
+                            'monto'               => (float) ($itemData['monto'] ?? 0),
+                            'costo_transportista' => $costoTransportista,
+                            'transportista_id'    => $transportistaId,
+                        ]);
+                        $idsParaConservar[] = $itemExistente->id;
+                    } else {
+                        $nuevoItem = $envio->items()->create([
+                            'cantidad'            => (int) $itemData['cantidad'],
+                            'descripcion'         => trim($itemData['descripcion']),
+                            'monto'               => (float) ($itemData['monto'] ?? 0),
+                            'costo_transportista' => $costoTransportista,
+                            'transportista_id'    => $transportistaId,
+                        ]);
+                        $idsParaConservar[] = $nuevoItem->id;
+                    }
+                }
+
+                $envio->items()->whereNotIn('id', $idsParaConservar)->delete();
             }
         });
 
@@ -111,6 +143,7 @@ class EnvioController extends Controller
         $validated = $request->validate([
             'pago' => ['required', Rule::in(['Pagado', 'Contra Entrega', 'Credito'])],
             'monto' => ['required', 'numeric', 'min:0', 'max:99999999.99'],
+            'costo_transportista' => ['nullable', 'numeric', 'min:0'],
             'items' => ['nullable', 'array'],
             'items.*.id' => ['nullable', 'integer'],
             'items.*.monto' => ['nullable', 'numeric', 'min:0'],
@@ -120,6 +153,7 @@ class EnvioController extends Controller
 
         DB::transaction(function () use ($envio, $validated, $monto): void {
             $costoTotalFlete = 0.0;
+            $tieneItemsConCosto = false;
 
             if (! empty($validated['items'])) {
                 foreach ($validated['items'] as $itemData) {
@@ -131,64 +165,38 @@ class EnvioController extends Controller
                                 'costo_transportista' => $fleteItem,
                             ]);
                             $costoTotalFlete += $fleteItem;
+                            if ($fleteItem > 0) {
+                                $tieneItemsConCosto = true;
+                            }
                         }
                     }
                 }
             }
 
+            $costoTransportistaFinal = $tieneItemsConCosto 
+                ? round($costoTotalFlete, 2)
+                : (isset($validated['costo_transportista']) ? round((float) $validated['costo_transportista'], 2) : $envio->costo_transportista);
+
+            // Se considera liquidado/aprobado cuando se define el pago y monto del envío
+            $estaLiquidado = in_array($validated['pago'], ['Pagado', 'Credito', 'Contra Entrega']) && $monto > 0;
+
             $envio->update([
                 'pago'                => $validated['pago'],
                 'monto'               => $monto,
-                'costo_transportista' => round($costoTotalFlete, 2),
-                'liquidado_at'        => now(),
+                'costo_transportista' => $costoTransportistaFinal,
+                'liquidado_at'        => $estaLiquidado ? ($envio->liquidado_at ?? now()) : null,
             ]);
 
-            if ($validated['pago'] === 'Credito') {
-                $existe = CuentaCorriente::query()
-                    ->where('envio_id', $envio->id)
-                    ->where('tipo', 'cargo')
-                    ->exists();
-
-                if (! $existe) {
-                    $saldoActual = $this->calcularSaldoCliente($envio->cliente_id);
-                    $nuevoSaldo = round($saldoActual + $monto, 2);
-
-                    CuentaCorriente::create([
-                        'cliente_id' => $envio->cliente_id,
-                        'envio_id' => $envio->id,
-                        'tipo' => 'cargo',
-                        'monto' => $monto,
-                        'saldo_acumulado' => $nuevoSaldo,
-                        'fecha' => $envio->fecha,
-                        'observacion' => 'Cargo automatico por envio '.$envio->codigo.' (Credito)',
-                    ]);
-                }
-            } elseif ($validated['pago'] === 'Pagado') {
-                $cargos = CuentaCorriente::query()
-                    ->where('envio_id', $envio->id)
-                    ->where('tipo', 'cargo')
-                    ->sum('monto');
-
-                if ((float) $cargos > 0) {
-                    $saldoActual = $this->calcularSaldoCliente($envio->cliente_id);
-                    $nuevoSaldo = round($saldoActual - $monto, 2);
-
-                    CuentaCorriente::create([
-                        'cliente_id' => $envio->cliente_id,
-                        'envio_id' => $envio->id,
-                        'tipo' => 'abono',
-                        'monto' => $monto,
-                        'saldo_acumulado' => $nuevoSaldo,
-                        'fecha' => now()->format('Y-m-d'),
-                        'observacion' => 'Abono automatico por envio '.$envio->codigo.' (Pagado)',
-                    ]);
-                }
+            // Sincronizar en cuentas por cobrar si es a crédito
+            if ($validated['pago'] === 'Credito' && $monto > 0) {
+                app(\App\Http\Controllers\Api\CuentaCorrienteController::class)->syncEnvioCredito($envio);
             }
         });
 
         return response()->json([
-            'ok' => true,
-            'data' => $this->format($envio->refresh()->load(['cliente', 'transportista', 'items'])),
+            'ok'      => true,
+            'message' => 'Monto actualizado con éxito.',
+            'data'    => $this->format($envio->fresh()->load(['cliente', 'transportista', 'items'])),
         ]);
     }
 
@@ -354,22 +362,18 @@ class EnvioController extends Controller
         $transportistas = \App\Models\Transportista::query()
             ->get()
             ->map(function ($transportista) {
-                // Cantidad de envíos liquidados pendientes de pago para este transportista
                 $enviosPendientes = EnvioItem::query()
-                    ->join('envios', 'envio_items.envio_id', '=', 'envios.id')
-                    ->where('envio_items.transportista_id', $transportista->id)
-                    ->whereNotNull('envios.liquidado_at')
-                    ->whereNull('envios.pagado_transportista_at')
-                    ->distinct('envios.id')
-                    ->count('envios.id');
+                    ->where('transportista_id', $transportista->id)
+                    ->where('costo_transportista', '>', 0)
+                    ->whereNull('pagado_transportista_at')
+                    ->distinct('envio_id')
+                    ->count('envio_id');
 
-                // Suma del flete pendiente de sus ítems
                 $deudaTotal = EnvioItem::query()
-                    ->join('envios', 'envio_items.envio_id', '=', 'envios.id')
-                    ->where('envio_items.transportista_id', $transportista->id)
-                    ->whereNotNull('envios.liquidado_at')
-                    ->whereNull('envios.pagado_transportista_at')
-                    ->sum('envio_items.costo_transportista');
+                    ->where('transportista_id', $transportista->id)
+                    ->where('costo_transportista', '>', 0)
+                    ->whereNull('pagado_transportista_at')
+                    ->sum('costo_transportista');
 
                 return [
                     'id'                => $transportista->id,
@@ -393,13 +397,14 @@ class EnvioController extends Controller
     {
         $envios = Envio::query()
             ->with(['cliente', 'items' => function ($q) use ($transportistaId) {
-                $q->where('transportista_id', $transportistaId);
+                $q->where('transportista_id', $transportistaId)
+                  ->whereNull('pagado_transportista_at');
             }])
             ->whereHas('items', function ($q) use ($transportistaId) {
-                $q->where('transportista_id', $transportistaId);
+                $q->where('transportista_id', $transportistaId)
+                  ->whereNull('pagado_transportista_at')
+                  ->where('costo_transportista', '>', 0);
             })
-            ->whereNotNull('liquidado_at')
-            ->whereNull('pagado_transportista_at')
             ->latest('id')
             ->get()
             ->map(function (Envio $envio) use ($transportistaId) {
@@ -820,6 +825,7 @@ XML;
                 'cantidad' => $item->cantidad,
                 'descripcion' => $item->descripcion,
                 'monto' => $item->monto,
+                'costo_transportista' => $item->costo_transportista,
             ])->values(),
             'guia' => $envio->guia,
             'pago' => $envio->pago,

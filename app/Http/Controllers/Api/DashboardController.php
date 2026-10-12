@@ -38,13 +38,12 @@ class DashboardController extends Controller
         }
 
         // 1. Totales y KPIs del período
-        $metricas = EnvioItem::query()
-            ->join('envios', 'envio_items.envio_id', '=', 'envios.id')
-            ->whereBetween('envios.fecha', [$desde, $hasta])
+        $metricas = Envio::query()
+            ->whereBetween('fecha', [$desde, $hasta])
             ->selectRaw('
-                COUNT(DISTINCT envios.id) as total_envios,
-                COALESCE(SUM(envio_items.monto), 0) as total_ingresos,
-                COALESCE(SUM(envio_items.costo_transportista), 0) as total_fletes
+                COUNT(id) as total_envios,
+                COALESCE(SUM(monto), 0) as total_ingresos,
+                COALESCE(SUM(costo_transportista), 0) as total_fletes
             ')
             ->first();
 
@@ -54,15 +53,14 @@ class DashboardController extends Controller
         $margenPct = $ingresos > 0 ? round(($utilidad / $ingresos) * 100, 1) : 0.0;
 
         // 2. Serie diaria para el gráfico de barras y línea
-        $serieDiaria = EnvioItem::query()
-            ->join('envios', 'envio_items.envio_id', '=', 'envios.id')
-            ->whereBetween('envios.fecha', [$desde, $hasta])
-            ->groupBy('envios.fecha')
-            ->orderBy('envios.fecha')
+        $serieDiaria = Envio::query()
+            ->whereBetween('fecha', [$desde, $hasta])
+            ->groupBy('fecha')
+            ->orderBy('fecha')
             ->selectRaw('
-                envios.fecha as fecha,
-                COALESCE(SUM(envio_items.monto), 0) as ingreso,
-                COALESCE(SUM(envio_items.costo_transportista), 0) as flete
+                fecha,
+                COALESCE(SUM(monto), 0) as ingreso,
+                COALESCE(SUM(costo_transportista), 0) as flete
             ')
             ->get()
             ->keyBy(fn($row) => Carbon::parse($row->fecha)->toDateString());
@@ -105,7 +103,6 @@ class DashboardController extends Controller
         $topTransportistasDeuda = EnvioItem::query()
             ->join('envios', 'envio_items.envio_id', '=', 'envios.id')
             ->join('transportistas', 'envio_items.transportista_id', '=', 'transportistas.id')
-            ->whereNotNull('envios.liquidado_at')
             ->whereNull('envios.pagado_transportista_at')
             ->groupBy('transportistas.id', 'transportistas.nombre')
             ->orderByDesc('total_pendiente')

@@ -50,6 +50,7 @@
                 @can('clientes.debt')
                     <a class="sidebar-link {{ request()->query('section') === 'cuentas' ? 'active' : '' }}" href="{{ route('sistema', ['section' => 'cuentas']) }}">Cuentas por cobrar</a>
                 @endcan
+                <a class="sidebar-link {{ request()->query('section') === 'auditoria' ? 'active' : '' }}" href="{{ route('sistema', ['section' => 'auditoria']) }}">Auditoría</a>
             </div>
         @endcan
 

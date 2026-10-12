@@ -331,6 +331,14 @@ function bindEvents() {
 
     $("#debt-client-search")?.addEventListener("input", debounce((event) => filterDebtClients(event.target.value.trim()), 250));
 
+    $("#client-search")?.addEventListener("input", debounce((event) => {
+        loadClients(1, event.target.value.trim());
+    }, 250));
+
+    $("#carrier-search")?.addEventListener("input", debounce((event) => {
+        loadCarriers(1, event.target.value.trim());
+    }, 250));
+
     $("#envio-form").addEventListener("submit", saveEnvio);
     on("#btn-save-client", "click", saveClient);
     on("#btn-show-client-form", "click", showClientForm);
@@ -361,6 +369,7 @@ function showSection(section) {
         usuarios: ["Usuarios", "Cuentas de acceso al sistema"],
         montos: ["Montos", "Envios pendientes de liquidacion"],
         cuentas: ["Cuentas por cobrar", "Control de deudas y abonos"],
+        auditoria: ["Auditoría Financiera", "Control y trazabilidad de ingresos y egresos"],
     };
 
     document.querySelectorAll("[data-page]").forEach((page) => {
@@ -398,6 +407,9 @@ function showSection(section) {
     }
     if (section === "cuentas") {
         loadDebtClients();
+    }
+    if (section === "auditoria") {
+        initAuditoriaFinanciera();
     }
     if (section === "dashboard") {
         loadDashboardGanancias();
@@ -1151,7 +1163,7 @@ async function openGestion(transportistaId) {
 
         const totalEnvios = state.gestionEnvios.length;
         const deudaTotal = state.gestionEnvios
-            .filter(e => e.liquidado_at && !e.pagado_transportista_at)
+            .filter(e => !e.pagado_transportista_at)
             .reduce((sum, e) => sum + Number(e.costo_pendiente ?? e.costo_transportista ?? 0), 0);
         const liquidados = state.gestionEnvios.filter(e => Boolean(e.pagado_transportista_at)).length;
 
@@ -1215,7 +1227,7 @@ function renderGestionEnvios() {
                 <td>${liquidado}</td>
                 <td>
                     <div class="row-actions">
-                        ${envio.liquidado_at ? `<button class="button button-primary" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;" data-gestion-pagar="${envio.id}" type="button">Pagar</button>` : `<span class="badge contra">No liquidado</span>`}
+                        ${(envio.liquidado_at || envio.costo_pendiente > 0) ? `<button class="button button-primary" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;" data-gestion-pagar="${envio.id}" type="button">Pagar</button>` : `<span class="badge contra">No liquidado</span>`}                    
                     </div>
                 </td>
             </tr>
@@ -1419,7 +1431,7 @@ function closeGestion() {
 async function liquidarDeudaTransportista() {
     if (!state.gestionTransportistaId) return;
 
-    const pendientes = (state.gestionEnvios || []).filter(e => e.liquidado_at && !e.pagado_transportista_at);
+    const pendientes = (state.gestionEnvios || []).filter(e => !e.pagado_transportista_at && Number(e.costo_pendiente ?? e.costo_transportista ?? 0) > 0);    
     if (!pendientes.length) {
         showToast("No hay envíos pendientes de liquidar.");
         return;
@@ -1866,14 +1878,32 @@ function exportEnvios() {
     window.location.href = `/api/envios/export?${filterParams().toString()}`;
 }
 
-async function loadManagementLists() {
-    try {
-        const [clientes, transportistas] = await Promise.all([
-            api.get("/clientes"),
-            api.get("/transportistas"),
-        ]);
-        renderClientsTable(clientes.data);
+let clientState = { page: 1, search: "" };
+let carrierState = { page: 1, search: "" };
 
+async function loadClients(page = 1, search = clientState.search) {
+    clientState.page = page;
+    clientState.search = search;
+    const params = new URLSearchParams({ page, per_page: 15 });
+    if (search) params.append("search", search);
+
+    try {
+        const response = await api.get(`/clientes?${params.toString()}`);
+        renderClientsTable(response.data);
+        renderAuditPagination("clients-pagination", response.meta, (newPage) => loadClients(newPage));
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+async function loadCarriers(page = 1, search = carrierState.search) {
+    carrierState.page = page;
+    carrierState.search = search;
+    const params = new URLSearchParams({ page, per_page: 15 });
+    if (search) params.append("search", search);
+
+    try {
+        const response = await api.get(`/transportistas?${params.toString()}`);
         let metrics = {};
         if (can("envios.amounts")) {
             try {
@@ -1883,10 +1913,15 @@ async function loadManagementLists() {
                 // metrics fail silently
             }
         }
-        renderCarriersTable(transportistas.data, metrics);
+        renderCarriersTable(response.data, metrics);
+        renderAuditPagination("carriers-pagination", response.meta, (newPage) => loadCarriers(newPage));
     } catch (error) {
         showToast(error.message, "error");
     }
+}
+
+async function loadManagementLists() {
+    await Promise.all([loadClients(1), loadCarriers(1)]);
 }
 
 function renderClientsTable(items) {
@@ -2065,8 +2100,8 @@ function openAmountModal(id) {
     $("#amount-envio-id").value = id;
     $("#amount-payment").value = envio.pago && envio.pago !== "Pendiente" ? envio.pago : "Credito";
 
-    const itemsTotal = envio.items ? envio.items.reduce((sum, i) => sum + (parseFloat(i.monto) || 0), 0) : 0;
-    $("#amount-total").value = envio.monto || (itemsTotal > 0 ? itemsTotal.toFixed(2) : "");
+    // Si ya existe monto cobrado al cliente, se mantiene; si no, queda vacío para asignarlo
+    $("#amount-total").value = envio.monto && parseFloat(envio.monto) > 0 ? envio.monto : "";
 
     $("#amount-summary").innerHTML = `
         <strong>${escapeHtml(envio.codigo)} - ${escapeHtml(envio.cliente || "Cliente")}</strong>
@@ -2088,15 +2123,21 @@ function renderAmountItems(items) {
         return;
     }
 
-    container.innerHTML = items.map((item, index) => `
-        <div class="amount-item-row" data-item-id="${item.id || ''}">
-            <div class="amount-item-info">
-                <strong>${escapeHtml(item.descripcion)}</strong>
-                <small>Cantidad: ${item.cantidad}</small>
+    container.innerHTML = items.map((item, index) => {
+        // Lee primero costo_transportista; si no existe, recurre a monto
+        const valorFlete = parseFloat(item.costo_transportista) || parseFloat(item.monto) || 0;
+        const valorDisplay = valorFlete > 0 ? valorFlete.toFixed(2) : '';
+
+        return `
+            <div class="amount-item-row" data-item-id="${item.id || ''}">
+                <div class="amount-item-info">
+                    <strong>${escapeHtml(item.descripcion)}</strong>
+                    <small>Cantidad: ${item.cantidad}</small>
+                </div>
+                <input type="text" class="amount-item-monto" value="${valorDisplay}" inputmode="decimal" placeholder="0.00" data-item-index="${index}">
             </div>
-            <input type="text" class="amount-item-monto" value="${item.monto > 0 ? item.monto : ''}" inputmode="decimal" placeholder="0.00" data-item-index="${index}">
-        </div>
-    `).join('');
+        `;
+    }).join('');
 
     updateAmountItemsTotal();
 
@@ -2136,16 +2177,19 @@ async function saveAmount(event) {
     event.preventDefault();
 
     const id = state.liquidatingEnvioId || Number($("#amount-envio-id").value);
+    const envio = state.envios.find((item) => item.id === id) || {};
+
     const payload = {
         monto: $("#amount-total").value,
         pago: $("#amount-payment").value,
+        costo_transportista: envio.costo_transportista || null,
         items: getAmountItemsPayload(),
     };
 
     try {
         await api.put(`/envios/${id}/liquidacion`, payload);
         closeAmountModal();
-        showToast("Monto registrado correctamente.");
+        showToast("Monto guardado correctamente.");
         loadEnvios();
         if ($("#pending-amounts-list")) loadPendingAmounts();
     } catch (error) {
@@ -2858,4 +2902,448 @@ async function loadDashboardGanancias() {
     } catch (err) {
         console.error("Error al cargar dashboard ejecutivo:", err);
     }
+}
+
+
+let auditCurrentTab = 'transportistas';
+let auditTransPage = 1;
+let auditCobroPage = 1;
+let auditTransChartInstance = null;
+let auditCobroChartInstance = null;
+
+function setupAuditTabs() {
+    const btnTrans = document.getElementById('tab-btn-audit-transportistas');
+    const btnCobros = document.getElementById('tab-btn-audit-cobros');
+    const contentTrans = document.getElementById('audit-tab-transportistas-content');
+    const contentCobros = document.getElementById('audit-tab-cobros-content');
+
+    if (!btnTrans || !btnCobros) return;
+
+    btnTrans.onclick = () => {
+        auditCurrentTab = 'transportistas';
+        btnTrans.style.background = 'var(--accent)';
+        btnTrans.style.color = '#000';
+        btnCobros.style.background = 'var(--panel-soft)';
+        btnCobros.style.color = 'var(--muted)';
+
+        contentTrans.classList.remove('hidden');
+        contentCobros.classList.add('hidden');
+        cargarAuditoriaTransportistas(auditTransPage);
+    };
+
+    btnCobros.onclick = () => {
+        auditCurrentTab = 'cobros';
+        btnCobros.style.background = 'var(--accent)';
+        btnCobros.style.color = '#000';
+        btnTrans.style.background = 'var(--panel-soft)';
+        btnTrans.style.color = 'var(--muted)';
+
+        contentCobros.classList.remove('hidden');
+        contentTrans.classList.add('hidden');
+        cargarAuditoriaCobros(auditCobroPage);
+    };
+
+    const btnFiltroTrans = document.getElementById('audit-trans-btn-filtrar');
+    if (btnFiltroTrans) btnFiltroTrans.onclick = () => cargarAuditoriaTransportistas(1);
+
+    const btnExportTrans = document.getElementById('audit-trans-btn-export');
+    if (btnExportTrans) btnExportTrans.onclick = () => exportarAuditoriaTransportistas();
+
+    const btnFiltroCobros = document.getElementById('audit-cobro-btn-filtrar');
+    if (btnFiltroCobros) btnFiltroCobros.onclick = () => cargarAuditoriaCobros(1);
+
+    const btnExportCobros = document.getElementById('audit-cobro-btn-export');
+    if (btnExportCobros) btnExportCobros.onclick = () => exportarAuditoriaCobros();
+
+    const inputBuscarTrans = document.getElementById('audit-trans-filter-buscar');
+    if (inputBuscarTrans) {
+        inputBuscarTrans.onkeyup = (e) => {
+            if (e.key === 'Enter') cargarAuditoriaTransportistas(1);
+        };
+    }
+
+    const inputBuscarCobro = document.getElementById('audit-cobro-filter-buscar');
+    if (inputBuscarCobro) {
+        inputBuscarCobro.onkeyup = (e) => {
+            if (e.key === 'Enter') cargarAuditoriaCobros(1);
+        };
+    }
+}
+
+// --- PESTAÑA 1: PAGOS A TRANSPORTISTAS ---
+async function cargarAuditoriaTransportistas(page = 1) {
+    auditTransPage = page;
+    const inicio = document.getElementById('audit-trans-filter-inicio')?.value || '';
+    const fin = document.getElementById('audit-trans-filter-fin')?.value || '';
+    const buscar = document.getElementById('audit-trans-filter-buscar')?.value || '';
+
+    const params = new URLSearchParams({ page });
+    if (inicio) params.append('fecha_inicio', inicio);
+    if (fin) params.append('fecha_fin', fin);
+    if (buscar) params.append('buscar', buscar);
+
+    const tbody = document.getElementById('audit-trans-table-body');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 2rem; color: var(--muted);">Cargando registros...</td></tr>';
+
+    try {
+        const res = await fetch(`/api/auditoria/transportistas?${params.toString()}`);
+        const resData = await res.json();
+        if (!resData.ok) throw new Error(resData.message || 'Error en respuesta');
+
+        document.getElementById('audit-trans-kpi-total').textContent = `S/ ${(resData.kpis?.total_desembolsado || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        document.getElementById('audit-trans-kpi-abonos').textContent = resData.kpis?.abonos_efectuados || 0;
+        document.getElementById('audit-trans-kpi-choferes').textContent = resData.kpis?.choferes_saldados || 0;
+
+        const pagos = resData.data?.data || [];
+        renderMixedTimelineChart('audit-trans-chart', pagos, 'fecha_pago', 'monto_total', '#ef6464', 'Desembolsos', auditTransChartInstance, (inst) => auditTransChartInstance = inst);
+
+        if (pagos.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 2rem; color: var(--muted);">No se encontraron desembolsos en este período.</td></tr>';
+            document.getElementById('audit-trans-pagination').innerHTML = '';
+            return;
+        }
+
+        tbody.innerHTML = pagos.map(p => {
+            const guiasInfo = p.items && p.items.length 
+                ? p.items.map(it => it.envio ? `${it.envio.codigo} (${it.envio.guia || 'Sin guía'})` : '').filter(Boolean).join(', ')
+                : (p.observacion || 'Flete liquidado');
+
+            return `
+                <tr style="border-bottom: 1px solid var(--line);">
+                    <td style="padding: 0.85rem 1rem; font-weight: 700; color: var(--accent);">#${p.numero_recibo || p.id}</td>
+                    <td style="padding: 0.85rem 1rem; color: var(--muted);">${new Date(p.fecha_pago).toLocaleDateString('es-PE')} <small>${new Date(p.fecha_pago).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</small></td>
+                    <td style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text);">${p.transportista?.nombre || 'N/A'}</td>
+                    <td style="padding: 0.85rem 1rem; font-weight: 700; color: var(--danger);">- S/ ${parseFloat(p.monto_total || 0).toFixed(2)}</td>
+                    <td style="padding: 0.85rem 1rem; color: var(--muted);">${p.user?.name || 'Sistema'}</td>
+                    <td style="padding: 0.85rem 1rem; color: var(--muted); font-size: 0.85rem;" title="${guiasInfo}">${guiasInfo.length > 40 ? guiasInfo.substring(0, 40) + '...' : guiasInfo}</td>
+                </tr>
+            `;
+        }).join('');
+
+        renderAuditPagination('audit-trans-pagination', resData.data, (newPage) => cargarAuditoriaTransportistas(newPage));
+    } catch (e) {
+        console.error('Error cargando auditoría de transportistas:', e);
+        if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--danger); padding: 2rem;">Error al consultar datos.</td></tr>';
+    }
+}
+
+
+function exportarAuditoriaTransportistas() {
+    const inicio = document.getElementById('audit-trans-filter-inicio')?.value || '';
+    const fin = document.getElementById('audit-trans-filter-fin')?.value || '';
+    const buscar = document.getElementById('audit-trans-filter-buscar')?.value || '';
+
+    const params = new URLSearchParams();
+    if (inicio) params.append('fecha_inicio', inicio);
+    if (fin) params.append('fecha_fin', fin);
+    if (buscar) params.append('buscar', buscar);
+
+    window.location.href = `/api/auditoria/transportistas/export?${params.toString()}`;
+}
+
+// --- PESTAÑA 2: COBRANZAS A CLIENTES ---
+async function cargarAuditoriaCobros(page = 1) {
+    auditCobroPage = page;
+    const inicio = document.getElementById('audit-cobro-filter-inicio')?.value || '';
+    const fin = document.getElementById('audit-cobro-filter-fin')?.value || '';
+    const buscar = document.getElementById('audit-cobro-filter-buscar')?.value || '';
+
+    const params = new URLSearchParams({ page });
+    if (inicio) params.append('fecha_inicio', inicio);
+    if (fin) params.append('fecha_fin', fin);
+    if (buscar) params.append('buscar', buscar);
+
+    const tbody = document.getElementById('audit-cobro-table-body');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 2rem; color: var(--muted);">Cargando registros...</td></tr>';
+
+    try {
+        const res = await fetch(`/api/auditoria/cobros?${params.toString()}`);
+        const resData = await res.json();
+        if (!resData.ok) throw new Error(resData.message || 'Error en respuesta');
+
+        document.getElementById('audit-cobro-kpi-total').textContent = `S/ ${(resData.kpis?.total_recaudado || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        document.getElementById('audit-cobro-kpi-cantidad').textContent = resData.kpis?.abonos_realizados || 0;
+        document.getElementById('audit-cobro-kpi-clientes').textContent = resData.kpis?.clientes_abonaron || 0;
+
+        const cobros = resData.data?.data || [];
+        renderMixedTimelineChart('audit-cobros-chart', cobros, 'fecha', 'monto', '#4ade80', 'Cobranzas', auditCobroChartInstance, (inst) => auditCobroChartInstance = inst);
+
+        if (cobros.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 2rem; color: var(--muted);">No se encontraron cobros en este período.</td></tr>';
+            document.getElementById('audit-cobro-pagination').innerHTML = '';
+            return;
+        }
+
+        tbody.innerHTML = cobros.map(c => {
+            const saldo = parseFloat(c.saldo_acumulado || 0);
+            const textoSaldo = saldo < 0 
+                ? `<span style="color: var(--success); font-weight: 600;">S/ ${Math.abs(saldo).toFixed(2)} (A favor)</span>` 
+                : (saldo === 0 ? `<span style="color: var(--muted);">S/ 0.00 (Saldado)</span>` : `<span style="color: var(--blue); font-weight: 600;">S/ ${saldo.toFixed(2)}</span>`);
+
+            return `
+                <tr style="border-bottom: 1px solid var(--line);">
+                    <td style="padding: 0.85rem 1rem; color: var(--muted);">${c.fecha}</td>
+                    <td style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text);">${c.cliente?.nombre || 'N/A'}</td>
+                    <td style="padding: 0.85rem 1rem; font-weight: 700; color: var(--success);">+ S/ ${parseFloat(c.monto || 0).toFixed(2)}</td>
+                    <td style="padding: 0.85rem 1rem;">${textoSaldo}</td>
+                    <td style="padding: 0.85rem 1rem; color: var(--muted);"><small>${c.observacion || 'Abono a línea de crédito'}</small></td>
+                </tr>
+            `;
+        }).join('');
+
+        renderAuditPagination('audit-cobro-pagination', resData.data, (newPage) => cargarAuditoriaCobros(newPage));
+    } catch (e) {
+        console.error('Error cargando auditoría de cobros:', e);
+        if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--danger); padding: 2rem;">Error al consultar datos.</td></tr>';
+    }
+}
+
+function exportarAuditoriaCobros() {
+    const inicio = document.getElementById('audit-cobro-filter-inicio')?.value || '';
+    const fin = document.getElementById('audit-cobro-filter-fin')?.value || '';
+    const buscar = document.getElementById('audit-cobro-filter-buscar')?.value || '';
+
+    const params = new URLSearchParams();
+    if (inicio) params.append('fecha_inicio', inicio);
+    if (fin) params.append('fecha_fin', fin);
+    if (buscar) params.append('buscar', buscar);
+
+    window.location.href = `/api/auditoria/cobros/export?${params.toString()}`;
+}
+
+// --- GRÁFICO MIXTO: MOVIMIENTO DIARIO + LÍNEA DE FLUJO ACUMULADO ---
+function renderMixedTimelineChart(canvasId, records, dateField, amountField, barColor, labelName, currentChartInstance, setChartInstance) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    if (currentChartInstance) {
+        currentChartInstance.destroy();
+    }
+
+    const agrupado = {};
+    records.forEach(r => {
+        const rawDate = r[dateField];
+        const dateKey = rawDate ? rawDate.substring(0, 10) : 'Sin fecha';
+        agrupado[dateKey] = (agrupado[dateKey] || 0) + parseFloat(r[amountField] || 0);
+    });
+
+    const labels = Object.keys(agrupado).sort();
+    const dataDiaria = labels.map(k => agrupado[k]);
+
+    let runningTotal = 0;
+    const dataAcumulada = dataDiaria.map(val => {
+        runningTotal += val;
+        return runningTotal;
+    });
+
+    const newChart = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels: labels.length ? labels : ['Sin operaciones'],
+            datasets: [
+                {
+                    type: 'line',
+                    label: `Acumulado ${labelName} (S/)`,
+                    data: dataAcumulada.length ? dataAcumulada : [0],
+                    borderColor: '#c5a043',
+                    backgroundColor: '#c5a043',
+                    borderWidth: 2.5,
+                    pointRadius: 5,
+                    pointHoverRadius: 7.5,
+                    pointBackgroundColor: '#c5a043',
+                    pointBorderColor: '#0b1120',
+                    pointBorderWidth: 2,
+                    fill: false,
+                    tension: 0.25
+                },
+                {
+                    type: 'bar',
+                    label: `Movimiento Diario (S/)`,
+                    data: dataDiaria.length ? dataDiaria : [0],
+                    backgroundColor: barColor,
+                    borderRadius: 5,
+                    maxBarThickness: 36
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: {
+                padding: { top: 12, bottom: 6, left: 6, right: 12 }
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    labels: {
+                        color: '#e2e8f0',
+                        font: { family: 'Inter', size: 12, weight: '600' },
+                        boxWidth: 14,
+                        padding: 15
+                    }
+                },
+                tooltip: {
+                    backgroundColor: '#0b1120',
+                    titleColor: '#f8fafc',
+                    bodyColor: '#cbd5e1',
+                    borderColor: 'rgba(197, 160, 67, 0.35)',
+                    borderWidth: 1,
+                    padding: 10,
+                    titleFont: { size: 12, weight: '700' },
+                    bodyFont: { size: 12 },
+                    callbacks: {
+                        label: (ctx) => ` ${ctx.dataset.label}: S/ ${Number(ctx.parsed.y).toLocaleString('es-PE', { minimumFractionDigits: 2 })}`
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        color: '#94a3b8',
+                        font: { size: 11, weight: '500' },
+                        padding: 6
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.06)',
+                        drawBorder: false
+                    },
+                    ticks: {
+                        color: '#cbd5e1',
+                        font: { size: 12, weight: '600' },
+                        padding: 8,
+                        callback: (v) => 'S/ ' + Number(v).toLocaleString('es-PE')
+                    }
+                }
+            }
+        }
+    });
+
+    setChartInstance(newChart);
+}
+
+// --- PAGINADOR REUTILIZABLE CON ESTILO DARK THEME ---
+function renderAuditPagination(containerId, meta, onPageChange) {
+    const container = document.getElementById(containerId);
+    if (!container || !meta) return;
+
+    const page = meta.current_page || 1;
+    const lastPage = meta.last_page || 1;
+
+    if (lastPage <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+
+    let html = '';
+    html += `<button class="pagination-btn" style="background: var(--panel); border: 1px solid var(--line); color: var(--text); padding: 0.35rem 0.65rem; border-radius: 4px; cursor: pointer;" ${page <= 1 ? "disabled" : ""} data-p="1">&laquo;</button>`;
+    html += `<button class="pagination-btn" style="background: var(--panel); border: 1px solid var(--line); color: var(--text); padding: 0.35rem 0.65rem; border-radius: 4px; cursor: pointer;" ${page <= 1 ? "disabled" : ""} data-p="${page - 1}">&lsaquo;</button>`;
+
+    for (let i = Math.max(1, page - 2); i <= Math.min(lastPage, page + 2); i++) {
+        const isActive = i === page;
+        html += `<button class="pagination-btn" style="background: ${isActive ? 'var(--accent)' : 'var(--panel)'}; color: ${isActive ? '#000' : 'var(--text)'}; font-weight: ${isActive ? '700' : '400'}; border: 1px solid var(--line); padding: 0.35rem 0.65rem; border-radius: 4px; cursor: pointer;" data-p="${i}">${i}</button>`;
+    }
+
+    html += `<button class="pagination-btn" style="background: var(--panel); border: 1px solid var(--line); color: var(--text); padding: 0.35rem 0.65rem; border-radius: 4px; cursor: pointer;" ${page >= lastPage ? "disabled" : ""} data-p="${page + 1}">&rsaquo;</button>`;
+    html += `<button class="pagination-btn" style="background: var(--panel); border: 1px solid var(--line); color: var(--text); padding: 0.35rem 0.65rem; border-radius: 4px; cursor: pointer;" ${page >= lastPage ? "disabled" : ""} data-p="${lastPage}">&raquo;</button>`;
+
+    container.innerHTML = html;
+    container.querySelectorAll('.pagination-btn[data-p]').forEach(btn => {
+        btn.onclick = () => {
+            const p = parseInt(btn.getAttribute('data-p'));
+            if (!isNaN(p) && p !== page && p >= 1 && p <= lastPage) {
+                onPageChange(p);
+            }
+        };
+    });
+}
+
+function setupLiveAutocomplete(inputId, dropdownId, urlEndpoint, docField, onSelectCallback) {
+    const input = document.getElementById(inputId);
+    const dropdown = document.getElementById(dropdownId);
+    if (!input || !dropdown) return;
+
+    let timer = null;
+
+    input.addEventListener('input', (e) => {
+        const query = e.target.value.trim();
+        clearTimeout(timer);
+
+        if (query.length < 2) {
+            dropdown.style.display = 'none';
+            dropdown.innerHTML = '';
+            return;
+        }
+
+        timer = setTimeout(async () => {
+            try {
+                const res = await fetch(`${urlEndpoint}?q=${encodeURIComponent(query)}`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                const json = await res.json();
+
+                if (!json.ok || !json.data || json.data.length === 0) {
+                    dropdown.style.display = 'none';
+                    dropdown.innerHTML = '';
+                    return;
+                }
+
+                dropdown.innerHTML = json.data.map(item => `
+                    <div class="ac-item" data-name="${item.nombre}" style="padding: 0.7rem 0.9rem; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 600; color: #f8fafc; font-size: 0.88rem;">${item.nombre}</span>
+                        <span style="color: #c5a043; font-family: monospace; font-size: 0.78rem; background: rgba(197, 160, 67, 0.12); padding: 2px 6px; border-radius: 4px;">Doc: ${item[docField] || 'S/D'}</span>
+                    </div>
+                `).join('');
+
+                dropdown.style.display = 'block';
+
+                dropdown.querySelectorAll('.ac-item').forEach(el => {
+                    el.onmouseenter = () => el.style.backgroundColor = 'rgba(197, 160, 67, 0.18)';
+                    el.onmouseleave = () => el.style.backgroundColor = 'transparent';
+                    el.onclick = () => {
+                        input.value = el.getAttribute('data-name');
+                        dropdown.style.display = 'none';
+                        onSelectCallback();
+                    };
+                });
+            } catch (err) {
+                dropdown.style.display = 'none';
+            }
+        }, 200);
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
+}
+
+function initAuditoriaFinanciera() {
+    setupAuditTabs();
+    
+    // Autocomplete para Transportistas
+    setupLiveAutocomplete(
+        'audit-trans-filter-buscar', 
+        'audit-trans-autocomplete-list', 
+        '/api/auditoria/transportistas/buscar-rapido', 
+        'documento', 
+        () => cargarAuditoriaTransportistas(1)
+    );
+
+    // Autocomplete para Clientes
+    setupLiveAutocomplete(
+        'audit-cobro-filter-buscar', 
+        'audit-cobro-autocomplete-list', 
+        '/api/auditoria/clientes/buscar-rapido', 
+        'dni', 
+        () => cargarAuditoriaCobros(1)
+    );
+
+    cargarAuditoriaTransportistas(1);
 }

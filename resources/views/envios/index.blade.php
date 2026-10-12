@@ -145,7 +145,13 @@
                     </section>
 
                     <section class="table-shell">
-                        <div class="table-scroll">
+                        <div class="table-tools">
+                                <label class="search-field">
+                                    <span>Buscar cliente</span>
+                                    <input id="client-search" type="search" placeholder="Nombre o documento">
+                                </label>
+                            </div>
+                            <div class="table-scroll">
                             <table>
                                 <thead>
                                     <tr>
@@ -161,6 +167,7 @@
                                 <tbody id="clients-list"></tbody>
                             </table>
                         </div>
+                            <div id="clients-pagination" class="pagination-wrapper"></div>
                     </section>
                 </section>
 
@@ -177,7 +184,13 @@
                         </section>
 
                         <section class="table-shell">
-                            <div class="table-scroll">
+                            <div class="table-tools">
+                                    <label class="search-field">
+                                        <span>Buscar transportista</span>
+                                        <input id="carrier-search" type="search" placeholder="Nombre o documento">
+                                    </label>
+                                </div>
+                                <div class="table-scroll">
                                 <table>
                                     <thead>
                                         <tr>
@@ -197,6 +210,7 @@
                                     <tbody id="carriers-list"></tbody>
                                 </table>
                             </div>
+                            <div id="carriers-pagination" class="pagination-wrapper"></div>
                         </section>
                     </div>
 
@@ -359,8 +373,180 @@
                             <tbody id="debt-clients-list"></tbody>
                             </table>
                         </div>
+                        <div id="clients-pagination" class="pagination-wrapper"></div>
                     </section>
 
+                </section>
+
+                <section class="module-page hidden" data-page="auditoria">
+                    <div class="page-head" style="margin-bottom: 1.25rem;">
+                        <div>
+                            <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.5rem; font-weight: 700; color: var(--text);">Auditoría Financiera & Conciliación</h2>
+                            <p class="section-desc" style="color: var(--muted);">Trazabilidad contable de recaudación a clientes y desembolsos a fleteros</p>
+                        </div>
+                    </div>
+
+                    <!-- Pestañas Superiores -->
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--line); padding-bottom: 0.5rem;">
+                        <button type="button" id="tab-btn-audit-transportistas" class="button" style="background: var(--accent); color: #000; font-weight: 700; border-radius: 8px; border: none; padding: 0.6rem 1.2rem; cursor: pointer;">
+                            Egresos: Pagos a Transportistas
+                        </button>
+                        <button type="button" id="tab-btn-audit-cobros" class="button" style="background: var(--panel-soft); color: var(--muted); font-weight: 600; border-radius: 8px; border: 1px solid var(--line); padding: 0.6rem 1.2rem; cursor: pointer;">
+                            Ingresos: Cobranzas a Clientes
+                        </button>
+                    </div>
+
+                    <!-- ================= CONTENIDO PESTAÑA 1: TRANSPORTISTAS ================= -->
+                    <div id="audit-tab-transportistas-content">
+                        <!-- KPIs -->
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+                            <div style="background: var(--panel); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--line); border-top: 3px solid var(--danger);">
+                                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600;">Total Desembolsado</span>
+                                <div style="margin-top: 0.5rem; font-size: 1.7rem; font-weight: 800; color: var(--danger);" id="audit-trans-kpi-total">S/ 0.00</div>
+                                <small style="color: var(--faint);">Salidas registradas</small>
+                            </div>
+                            <div style="background: var(--panel); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--line); border-top: 3px solid var(--blue);">
+                                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600;">Recibos Emitidos</span>
+                                <div style="margin-top: 0.5rem; font-size: 1.7rem; font-weight: 800; color: var(--text);" id="audit-trans-kpi-abonos">0</div>
+                                <small style="color: var(--faint);">Comprobantes de flete</small>
+                            </div>
+                            <div style="background: var(--panel); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--line); border-top: 3px solid var(--accent);">
+                                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600;">Choferes Saldados</span>
+                                <div style="margin-top: 0.5rem; font-size: 1.7rem; font-weight: 800; color: var(--accent);" id="audit-trans-kpi-choferes">0</div>
+                                <small style="color: var(--faint);">Transportistas distintos</small>
+                            </div>
+                        </div>
+
+                        <!-- Filtros Rápidos -->
+                        <div style="background: var(--panel); padding: 1rem; border-radius: 10px; border: 1px solid var(--line); margin-bottom: 1.25rem; display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap;">
+                           <div style="flex: 2; min-width: 220px; position: relative;">
+                                <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.35rem;">Buscar Chofer (Nombre o DNI/RUC)</label>
+                                <input id="audit-trans-filter-buscar" type="text" class="input" placeholder="Escribe al menos 2 letras..." autocomplete="off" style="width: 100%; background: var(--panel-soft); color: var(--text); border: 1px solid var(--line);">
+                                <div id="audit-trans-autocomplete-list" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #0b1120; border: 1px solid rgba(197, 160, 67, 0.4); border-radius: 8px; box-shadow: 0 12px 30px rgba(0,0,0,0.7); z-index: 100; max-height: 220px; overflow-y: auto;"></div>
+                            </div>
+                            <div style="flex: 1; min-width: 140px;">
+                                <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.35rem;">Desde</label>
+                                <input id="audit-trans-filter-inicio" type="date" class="input" style="width: 100%; background: var(--panel-soft); color: var(--text); border: 1px solid var(--line);">
+                            </div>
+                            <div style="flex: 1; min-width: 140px;">
+                                <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.35rem;">Hasta</label>
+                                <input id="audit-trans-filter-fin" type="date" class="input" style="width: 100%; background: var(--panel-soft); color: var(--text); border: 1px solid var(--line);">
+                            </div>
+                            <button class="button" id="audit-trans-btn-filtrar" type="button" style="background: var(--accent); color: #000; font-weight: 700; border: none; padding: 0.55rem 1.2rem; border-radius: 6px;">
+                                Filtrar
+                            </button>
+                            <button class="button" id="audit-trans-btn-export" type="button" style="background: var(--panel-soft); color: var(--text); font-weight: 600; border: 1px solid var(--line); padding: 0.55rem 1.2rem; border-radius: 6px; display: inline-flex; align-items: center; gap: 0.4rem;">
+                                Exportar Excel
+                            </button>
+                        </div>
+
+                        <!-- Gráfico Timeline Mixto -->
+                        <div style="background: var(--panel); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--line); margin-bottom: 1.25rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                                <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text);">Línea de Tiempo de Desembolsos</h4>
+                                <small style="color: var(--muted);">Barras diarias vs. Línea dorada de acumulación</small>
+                            </div>
+                            <div style="height: 260px; position: relative;">
+                                <canvas id="audit-trans-chart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Tabla -->
+                        <div class="table-shell" style="border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--panel);">
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="background: var(--panel-soft); text-align: left; border-bottom: 1px solid var(--line);">
+                                        <th style="padding: 0.75rem 1rem; color: var(--muted);">Recibo</th>
+                                        <th style="padding: 0.75rem 1rem; color: var(--muted);">Fecha</th>
+                                        <th style="padding: 0.75rem 1rem; color: var(--muted);">Transportista</th>
+                                        <th style="padding: 0.75rem 1rem; color: var(--muted);">Monto Pagado</th>
+                                        <th style="padding: 0.75rem 1rem; color: var(--muted);">Responsable</th>
+                                        <th style="padding: 0.75rem 1rem; color: var(--muted);">Guías / Desglose</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="audit-trans-table-body">
+                                    <tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--muted);">Cargando registros...</td></tr>
+                                </tbody>
+                            </table>
+                            <div id="audit-trans-pagination" style="display: flex; justify-content: flex-end; gap: 0.5rem; padding: 0.75rem 1rem; background: var(--panel-soft); border-top: 1px solid var(--line);"></div>
+                        </div>
+                    </div>
+
+                    <!-- ================= CONTENIDO PESTAÑA 2: COBRANZAS ================= -->
+                    <div id="audit-tab-cobros-content" class="hidden">
+                        <!-- KPIs -->
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+                            <div style="background: var(--panel); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--line); border-top: 3px solid var(--success);">
+                                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600;">Total Recaudado</span>
+                                <div style="margin-top: 0.5rem; font-size: 1.7rem; font-weight: 800; color: var(--success);" id="audit-cobro-kpi-total">S/ 0.00</div>
+                                <small style="color: var(--faint);">Ingresos a cuenta</small>
+                            </div>
+                            <div style="background: var(--panel); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--line); border-top: 3px solid var(--blue);">
+                                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600;">Abonos Registrados</span>
+                                <div style="margin-top: 0.5rem; font-size: 1.7rem; font-weight: 800; color: var(--text);" id="audit-cobro-kpi-cantidad">0</div>
+                                <small style="color: var(--faint);">Transacciones</small>
+                            </div>
+                            <div style="background: var(--panel); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--line); border-top: 3px solid var(--accent);">
+                                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600;">Clientes que Abonaron</span>
+                                <div style="margin-top: 0.5rem; font-size: 1.7rem; font-weight: 800; color: var(--accent);" id="audit-cobro-kpi-clientes">0</div>
+                                <small style="color: var(--faint);">Clientes amortizados</small>
+                            </div>
+                        </div>
+
+                        <!-- Filtros Rápidos -->
+                        <div style="background: var(--panel); padding: 1rem; border-radius: 10px; border: 1px solid var(--line); margin-bottom: 1.25rem; display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap;">
+                            <div style="flex: 2; min-width: 220px; position: relative;">
+                                <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.35rem;">Buscar Cliente (Nombre o RUC/DNI)</label>
+                                <input id="audit-cobro-filter-buscar" type="text" class="input" placeholder="Escribe al menos 2 letras..." autocomplete="off" style="width: 100%; background: var(--panel-soft); color: var(--text); border: 1px solid var(--line);">
+                                <div id="audit-cobro-autocomplete-list" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #0b1120; border: 1px solid rgba(197, 160, 67, 0.4); border-radius: 8px; box-shadow: 0 12px 30px rgba(0,0,0,0.7); z-index: 100; max-height: 220px; overflow-y: auto;"></div>
+                            </div>
+                            <div style="flex: 1; min-width: 140px;">
+                                <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.35rem;">Desde</label>
+                                <input id="audit-cobro-filter-inicio" type="date" class="input" style="width: 100%; background: var(--panel-soft); color: var(--text); border: 1px solid var(--line);">
+                            </div>
+                            <div style="flex: 1; min-width: 140px;">
+                                <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.35rem;">Hasta</label>
+                                <input id="audit-cobro-filter-fin" type="date" class="input" style="width: 100%; background: var(--panel-soft); color: var(--text); border: 1px solid var(--line);">
+                            </div>
+                            
+                            <button class="button" id="audit-cobro-btn-filtrar" type="button" style="background: var(--accent); color: #000; font-weight: 700; border: none; padding: 0.55rem 1.2rem; border-radius: 6px;">
+                                Filtrar
+                            </button>
+                            <button class="button" id="audit-cobro-btn-export" type="button" style="background: var(--panel-soft); color: var(--text); font-weight: 600; border: 1px solid var(--line); padding: 0.55rem 1.2rem; border-radius: 6px; display: inline-flex; align-items: center; gap: 0.4rem;">
+                                Exportar Excel
+                            </button>
+                        </div>
+
+                        <!-- Gráfico Timeline Mixto Cobranzas -->
+                        <div style="background: var(--panel); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--line); margin-bottom: 1.25rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                                <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text);">Evolución de Cobranzas</h4>
+                                <small style="color: var(--muted);">Recaudación diaria vs. Línea dorada de acumulación</small>
+                            </div>
+                            <div style="height: 260px; position: relative;">
+                                <canvas id="audit-cobros-chart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Tabla -->
+                        <div class="table-shell" style="border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--panel);">
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="background: var(--panel-soft); text-align: left; border-bottom: 1px solid var(--line);">
+                                        <th style="padding: 0.75rem 1rem; color: var(--muted);">Fecha</th>
+                                        <th style="padding: 0.75rem 1rem; color: var(--muted);">Cliente</th>
+                                        <th style="padding: 0.75rem 1rem; color: var(--muted);">Monto Recaudado</th>
+                                        <th style="padding: 0.75rem 1rem; color: var(--muted);">Deuda Remanente</th>
+                                        <th style="padding: 0.75rem 1rem; color: var(--muted);">Concepto</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="audit-cobro-table-body">
+                                    <tr><td colspan="5" style="text-align: center; padding: 2rem; color: var(--muted);">Cargando registros...</td></tr>
+                                </tbody>
+                            </table>
+                            <div id="audit-cobro-pagination" style="display: flex; justify-content: flex-end; gap: 0.5rem; padding: 0.75rem 1rem; background: var(--panel-soft); border-top: 1px solid var(--line);"></div>
+                        </div>
+                    </div>
                 </section>
 
                 <section class="module-page{{ auth()->user()->cannot('dashboard.view') ? ' hidden' : '' }}" data-page="dashboard">
