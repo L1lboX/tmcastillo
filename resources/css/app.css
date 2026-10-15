@@ -2366,3 +2366,146 @@ tbody tr:hover {
 .item-row .form-grid {
     gap: 0.5rem;
 }
+
+/* Cabecera de la sección */
+.items-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.items-modal-header h3 {
+    margin: 0;
+}
+
+.items-modal-header .button {
+    margin-top: 0 !important;
+}
+
+/* Contenedor con scroll interno */
+.items-table-scroll-container {
+    max-height: 270px;
+    overflow-y: auto;
+    border: 1px solid rgba(255, 255, 255, 0.15); /* Borde perimetral visible */
+    border-radius: 6px;
+    background: #060a14;
+}
+
+/* Scrollbar delgada y temática oscura */
+.items-table-scroll-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.items-table-scroll-container::-webkit-scrollbar-track {
+    background: rgba(3, 7, 18, 0.6);
+    border-radius: 4px;
+}
+
+.items-table-scroll-container::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
+.items-table-scroll-container::-webkit-scrollbar-thumb:hover {
+    background: var(--accent);
+}
+
+/* Estructura general de la tabla */
+.items-modal-table {
+    width: 100%;
+    min-width: 0 !important;
+    border-collapse: collapse;
+}
+
+/* Cabecera fija (Sticky) con borde dorado sutil */
+.items-modal-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #0f1624;
+    border-bottom: 2px solid rgba(197, 160, 67, 0.4);
+    padding: 8px 10px;
+    font-size: 10.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+/* Filas con cebrado sutil para separar cada elemento */
+.items-modal-table tbody tr {
+    background: rgba(255, 255, 255, 0.02);
+    transition: background 0.15s ease;
+}
+
+.items-modal-table tbody tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.items-modal-table tbody tr:hover {
+    background: rgba(197, 160, 67, 0.08);
+}
+
+/* Celdas con bordes definidos y visibles */
+.items-modal-table td {
+    padding: 6px 8px;
+    vertical-align: middle;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.items-modal-table td:last-child {
+    border-right: none;
+}
+
+.item-table-index {
+    text-align: center;
+    color: var(--muted);
+    font-weight: 700;
+    font-size: 11px;
+}
+
+/* Cajas de texto (inputs) integradas y contrastadas */
+.items-modal-table input.item-cantidad,
+.items-modal-table input.item-descripcion {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 32px;
+    padding: 5px 9px;
+    font-size: 12px;
+    background: #0b111e;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 5px;
+    color: var(--text);
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.items-modal-table input.item-cantidad:focus,
+.items-modal-table input.item-descripcion:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-soft);
+    background: #0e1526;
+}
+
+/* Botón de eliminar (papelera) */
+.btn-item-delete {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 5px;
+    color: var(--muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s, background 0.15s;
+}
+
+.btn-item-delete:hover:not(:disabled) {
+    color: var(--danger);
+    background: rgba(239, 100, 100, 0.18);
+}
+
+.btn-item-delete .material-icon {
+    font-size: 18px;
+}

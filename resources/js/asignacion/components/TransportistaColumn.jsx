@@ -31,14 +31,34 @@ export function TransportistaColumn({ transportista, items, envio, onAsignarTodo
                     </button>
                 </div>
             </header>
-            <div ref={setNodeRef} className="kanban-column-body">
+            <div 
+                ref={setNodeRef} 
+                className="kanban-column-body"
+                style={{ 
+                    minHeight: '350px', 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '8px',
+                    height: '100%',
+                    flexGrow: 1
+                }}
+            >
                 {items.length === 0 ? (
-                    <div className="kanban-column-empty">
+                    <div 
+                        className="kanban-column-empty"
+                        style={{ pointerEvents: 'none', flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
                         Arrastra items aquí
                     </div>
                 ) : (
                     items.map((item) => (
-                        <ItemCard key={item.id} item={item} envio={envio} onSplitClick={onSplitClick} onMergeClick={onMergeClick}/>
+                        <ItemCard 
+                            key={item.id} 
+                            item={item} 
+                            envio={envio} 
+                            onSplitClick={onSplitClick} 
+                            onMergeClick={onMergeClick}
+                        />
                     ))
                 )}
             </div>

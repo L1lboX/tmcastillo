@@ -109,6 +109,40 @@ class CuentaCorrienteController extends Controller
             $saldoActual = $this->calcularSaldoCliente($clienteId);
             $nuevoSaldo = round($saldoActual - (float) $validated['monto'], 2);
 
+            // 1. Obtener únicamente los envíos pendientes de este cliente
+            $enviosPendientes = Envio::query()
+                ->where('cliente_id', $clienteId)
+                ->where('pago', 'Credito')
+                ->whereNotNull('monto')
+                ->where('monto', '>', 0)
+                ->orderBy('fecha', 'asc')
+                ->orderBy('id', 'asc')
+                ->lockForUpdate()
+                ->get();
+
+            // 2. Suma de los pendientes actuales
+            $totalMontoPendiente = (float) $enviosPendientes->sum('monto');
+
+            // 3. Saldo disponible real (rescata el remanente previo acumulado)
+            $saldoDisponible = round($totalMontoPendiente - max(0, $nuevoSaldo), 2);
+
+            // 4. Evaluar y marcar como Pagado los que alcancen completos
+            foreach ($enviosPendientes as $envio) {
+                $montoEnvio = (float) $envio->monto;
+
+                if ($saldoDisponible >= $montoEnvio) {
+                    $envio->pago = 'Pagado';
+                    $envio->save();
+
+                    $saldoDisponible = round($saldoDisponible - $montoEnvio, 2);
+                }
+
+                if ($saldoDisponible <= 0) {
+                    break;
+                }
+            }
+
+            // 5. Registrar el abono en cuenta corriente
             return CuentaCorriente::create([
                 'cliente_id' => $clienteId,
                 'tipo' => 'abono',

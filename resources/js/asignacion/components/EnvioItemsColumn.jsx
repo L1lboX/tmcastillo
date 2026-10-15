@@ -24,7 +24,10 @@ export function EnvioItemsColumn({ envio, items, onSplitClick, onMergeClick }) {
                 style={{ minHeight: '300px', display: 'flex', flexDirection: 'column', gap: '8px' }}
             >
                 {sinAsignar.length === 0 ? (
-                    <div className="kanban-column-empty">
+                    <div 
+                        className="kanban-column-empty"
+                        style={{ pointerEvents: 'none', flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
                         Todos los items están asignados
                     </div>
                 ) : (

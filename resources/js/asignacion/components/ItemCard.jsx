@@ -1,5 +1,4 @@
 import { useDraggable, useDroppable } from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
 
 const ENVIO_COLORS = [
     '#c5a043', '#60a5fa', '#4ade80', '#f59e0b', '#ef6464',
@@ -11,38 +10,47 @@ function getEnvioColor(envioId) {
     return ENVIO_COLORS[envioId % ENVIO_COLORS.length];
 }
 
-export function ItemCard({ item, envio, allItems = [], onSplitClick, onMergeClick }) {
-    const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
-        id: `item-${item?.id}`,
+export function ItemCard({ item, envio, allItems = [], onSplitClick, onMergeClick, isOverlay = false }) {
+    // Si es la copia del overlay, no activamos useDraggable ni useDroppable
+    const {
+        attributes,
+        listeners,
+        setNodeRef: setDragRef,
+        isDragging,
+    } = useDraggable({
+        id: item?.id,
         data: { type: 'item', item, envio },
+        disabled: isOverlay,
     });
 
-    
     const { setNodeRef: setDropRef, isOver } = useDroppable({
         id: `item-drop-${item?.id}`,
         data: { type: 'item', item, envio },
+        disabled: isOverlay,
     });
 
     if (!item || !envio) return null;
 
-
+    // Al usar DragOverlay, la tarjeta original se queda quieta en su sitio (sin transform)
+    // y solo bajamos su opacidad como placeholder.
     const style = {
-        transform: CSS.Translate.toString(transform),
-        opacity: isDragging ? 0.4 : 1,
+        opacity: isDragging ? 0.3 : 1,
+        pointerEvents: isDragging ? 'none' : undefined,
+        width: '100%',
+        boxSizing: 'border-box',
     };
 
     const color = getEnvioColor(envio.id);
-    const canSplit = item.cantidad > 1 && typeof onSplitClick === 'function';
+    const canSplit = !isOverlay && item.cantidad > 1 && typeof onSplitClick === 'function';
 
     const normalize = (str) => (str || '').trim().toLowerCase();
-
     const todosLosItems = Array.isArray(envio?.items) ? envio.items : [];
 
     const hermanoCompatible = todosLosItems.find(
         (otro) => otro && otro.id !== item.id && normalize(otro.descripcion) === normalize(item.descripcion)
     );
 
-    const canMerge = Boolean(hermanoCompatible && typeof onMergeClick === 'function');
+    const canMerge = !isOverlay && Boolean(hermanoCompatible && typeof onMergeClick === 'function');
 
     const handleContextMenu = (e) => {
         if (!canSplit) return;
@@ -59,12 +67,16 @@ export function ItemCard({ item, envio, allItems = [], onSplitClick, onMergeClic
     };
 
     return (
-        <div ref={setDropRef} className="kanban-item-drop-target" style={{ width: '100%' }}>
+        <div 
+            ref={setDropRef} 
+            className="kanban-item-drop-target" 
+            style={{ width: '100%', flexShrink: 0 }}
+        >
             <div
                 ref={setDragRef}
                 style={style}
-                {...listeners}
-                {...attributes}
+                {...(!isOverlay ? listeners : {})}
+                {...(!isOverlay ? attributes : {})}
                 onContextMenu={handleContextMenu}
                 className={`kanban-item-card ${isOver && !isDragging ? 'item-card-drop-hover' : ''}`}
             >

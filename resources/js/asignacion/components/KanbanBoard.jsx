@@ -1,4 +1,4 @@
-import { DndContext, DragOverlay, closestCorners } from '@dnd-kit/core';
+import { DndContext, DragOverlay, pointerWithin } from '@dnd-kit/core';
 import { useState } from 'react';
 import { TransportistaColumn } from './TransportistaColumn';
 import { EnvioItemsColumn } from './EnvioItemsColumn';
@@ -91,7 +91,7 @@ export function KanbanBoard({
 
     return (
         <DndContext
-            collisionDetection={closestCorners}
+            collisionDetection={pointerWithin}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
         >
@@ -132,10 +132,9 @@ export function KanbanBoard({
 
             <DragOverlay>
                 {activeItem?.type === 'item' && (
-                    <ItemCard item={activeItem.item} envio={activeItem.envio} />
+                    <ItemCard item={activeItem.item} envio={activeItem.envio} isOverlay={true} />
                 )}
             </DragOverlay>
-
             {splittingItem && (
                 <SplitItemModal
                     isOpen={true}

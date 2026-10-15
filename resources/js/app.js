@@ -1708,22 +1708,39 @@ function renderItems() {
     if (!container) return;
 
     container.innerHTML = state.items.map((item, index) => `
-        <div class="item-row" data-item-index="${index}">
-            <div class="form-grid four">
-                <label>
-                    <span>Cantidad</span>
-                    <input type="text" class="item-cantidad" value="${escapeHtml(item.cantidad)}" inputmode="numeric" placeholder="1">
-                </label>
-                <label class="span-2">
-                    <span>Descripción</span>
-                    <input type="text" class="item-descripcion" value="${escapeHtml(item.descripcion)}" placeholder="Ej: cajas pequeñas de mostaza de sachet">
-                </label>
-                <label>
-                    <span>&nbsp;</span>
-                    <button class="button button-soft" type="button" data-remove-item="${index}" ${state.items.length <= 1 ? 'disabled' : ''}>Quitar</button>
-                </label>
-            </div>
-        </div>
+        <tr class="item-table-row" data-item-index="${index}">
+            <td class="item-table-index">${index + 1}</td>
+            <td>
+                <input 
+                    type="text" 
+                    class="item-cantidad" 
+                    value="${escapeHtml(item.cantidad)}" 
+                    inputmode="numeric" 
+                    placeholder="1"
+                    autocomplete="off"
+                >
+            </td>
+            <td>
+                <input 
+                    type="text" 
+                    class="item-descripcion" 
+                    value="${escapeHtml(item.descripcion)}" 
+                    placeholder="Ej: cajas pequeñas de mostaza de sachet"
+                    autocomplete="off"
+                >
+            </td>
+            <td style="text-align: center;">
+                <button 
+                    type="button" 
+                    class="btn-item-delete" 
+                    data-remove-item="${index}" 
+                    title="Quitar ítem"
+                    ${state.items.length <= 1 ? 'disabled style="opacity: 0.2; cursor: not-allowed;"' : ''}
+                >
+                    <span class="material-icon delete">delete</span>
+                </button>
+            </td>
+        </tr>
     `).join('');
 
     container.querySelectorAll('.item-cantidad').forEach((input, i) => {
@@ -1732,13 +1749,18 @@ function renderItems() {
             state.items[i].cantidad = e.target.value;
         });
     });
+
     container.querySelectorAll('.item-descripcion').forEach((input, i) => {
         input.addEventListener('input', (e) => {
             state.items[i].descripcion = e.target.value;
         });
     });
+
     container.querySelectorAll('[data-remove-item]').forEach((btn) => {
-        btn.addEventListener('click', () => removeItem(Number(btn.dataset.removeItem)));
+        btn.addEventListener('click', (e) => {
+            const index = Number(e.currentTarget.dataset.removeItem);
+            removeItem(index);
+        });
     });
 }
 

@@ -233,14 +233,23 @@
 }
 
 /* Tarjetas */
+.kanban-item-drop-target {
+    width: 100%;
+    flex-shrink: 0;
+    box-sizing: border-box;
+}
+
 .kanban-item-card {
     background: var(--kanban-card-bg);
     border-radius: 10px;
     box-shadow: var(--kanban-card-shadow);
     overflow: hidden;
     cursor: grab;
-    transition: box-shadow .2s ease, transform .15s ease;
+    transition: box-shadow .2s ease;
     display: flex;
+    width: 100%;
+    box-sizing: border-box;
+    touch-action: none;
 }
 
 .kanban-item-card:hover {
@@ -363,10 +372,11 @@
 .item-card-drop-hover {
     outline: 2px dashed #2563eb !important;
     background-color: #eff6ff !important;
-    transform: scale(1.02);
-    transition: transform 0.15s ease, background-color 0.15s ease;
 }
 
+[data-dnd-overlay] {
+    pointer-events: none !important;
+}
 /*para imputs*/
 
 input[type="number"]::-webkit-outer-spin-button,

@@ -985,10 +985,28 @@
                     </div>
                 </div>
 
-                <div class="form-section">
-                    <h3>03 Items del envío</h3>
-                    <div id="items-container"></div>
-                    <button class="button button-soft button-with-icon icon-add" id="btn-add-item" type="button" style="margin-top: 0.5rem;">Agregar item</button>
+                <div class="form-section form-section-items-modal">
+                    <div class="items-modal-header">
+                        <h3>03 Items del envío</h3>
+                        <button class="button button-soft button-with-icon icon-add" id="btn-add-item" type="button">
+                            Agregar item
+                        </button>
+                    </div>
+                    <div class="items-table-scroll-container">
+                        <table class="items-modal-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 45px; text-align: center;">#</th>
+                                    <th style="width: 110px;">Cantidad</th>
+                                    <th>Descripción</th>
+                                    <th style="width: 45px; text-align: center;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="items-container">
+                                <!-- Se inyectan las filas aquí -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <div class="form-section">
