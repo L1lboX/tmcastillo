@@ -11,10 +11,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AuditoriaCobroController extends Controller
-    
 {
     use GeneratesExcel;
-   public function index(Request $request): JsonResponse
+
+    public function index(Request $request): JsonResponse
     {
         $fechaInicio = $request->query('fecha_inicio');
         $fechaFin    = $request->query('fecha_fin');
@@ -41,7 +41,7 @@ class AuditoriaCobroController extends Controller
             ]);
         }
 
-        // 1. KPIs calculados sobre los mismos filtros (histórico total si no hay rango de fechas)
+        // 1. KPIs calculados sobre los mismos filtros
         $kpiQuery = (clone $query);
 
         $totalRecaudado   = (float) $kpiQuery->sum('monto');
@@ -68,7 +68,7 @@ class AuditoriaCobroController extends Controller
         ]);
     }
 
-    public function autocompletarClientes(\Illuminate\Http\Request $request): \Illuminate\Http\JsonResponse
+    public function autocompletarClientes(Request $request): JsonResponse
     {
         $q = trim((string) $request->query('q', ''));
         if (mb_strlen($q) < 2) {
@@ -84,7 +84,6 @@ class AuditoriaCobroController extends Controller
 
         return response()->json(['ok' => true, 'data' => $clientes]);
     }
-
 
     public function export(Request $request): Response
     {
@@ -119,16 +118,16 @@ class AuditoriaCobroController extends Controller
             ]);
         }
 
+        // Encabezados limpios sin glosa confusa
         $headers = [
             'ID',
             'Fecha',
             'Cliente',
             'DNI / Documento',
             'Telefono',
-            'Guia / Envio',
-            'Metodo Pago',
+            'Guía / Envío',
+            'Método Pago',
             'Monto Cobrado',
-            'Detalle / Glosa',
         ];
 
         $abonos = $query->get();
@@ -145,7 +144,6 @@ class AuditoriaCobroController extends Controller
                 $guia,
                 $mov->metodo_pago ?? 'Efectivo',
                 number_format((float) $mov->monto, 2, '.', ''),
-                $mov->glosa ?? $mov->detalle ?? '-',
             ];
         });
 

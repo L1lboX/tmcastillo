@@ -67,7 +67,7 @@ class EnvioController extends Controller
                     'descripcion'         => trim($item['descripcion']),
                     'monto'               => (float) ($item['monto'] ?? 0),
                     'costo_transportista' => (float) ($item['costo_transportista'] ?? 0),
-                    'transportista_id'    => $item['transportista_id'] ?? null,
+                    'transportista_id'    => $item['transportista_id'] ?? $data['transportista_id'],
                 ]);
             }
 
@@ -105,7 +105,7 @@ class EnvioController extends Controller
 
                     $transportistaId = ! empty($itemData['transportista_id'])
                         ? $itemData['transportista_id']
-                        : ($itemExistente?->transportista_id ?? null);
+                        : ($itemExistente?->transportista_id ?? $envio->transportista_id);
 
                     if ($itemExistente) {
                         $itemExistente->update([
@@ -506,6 +506,7 @@ class EnvioController extends Controller
             'codigo' => ['nullable', 'string', 'max:20'],
             'fecha' => ['required', 'date'],
             'cliente_id' => ['nullable', 'integer', 'exists:clientes,id'],
+            'transportista_id' => ['required', 'integer', 'exists:transportistas,id'],
             'guia' => [
                 'required',
                 'string',
@@ -537,6 +538,7 @@ class EnvioController extends Controller
         $data = [
             'codigo' => trim((string) ($validated['codigo'] ?? '')) ?: $this->nextCode(),
             'fecha' => $validated['fecha'],
+            'transportista_id' => $validated['transportista_id'],
             'guia' => strtoupper(trim($validated['guia'])),
             'observacion' => trim((string) ($validated['observacion'] ?? '')) ?: null,
         ];

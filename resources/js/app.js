@@ -124,7 +124,8 @@ const api = {
 
 document.addEventListener("DOMContentLoaded", () => {
     initLoginCanvas();
-
+    loadTransportistasForLookup();
+    initTransportistaSearch();
     if (!$("#envio-form")) {
         return;
     }
@@ -207,12 +208,6 @@ function bindEvents() {
     document.addEventListener("input", (event) => {
         if (event.target?.id === "f-cliente-search") {
             debouncedClientSearch();
-        }
-    });
-
-    document.addEventListener("focusin", (event) => {
-        if (event.target?.id === "f-cliente-search") {
-            searchClient();
         }
     });
 
@@ -692,6 +687,9 @@ function openAbonoModalForClient(id, dni, nombre, saldo) {
     $("#abono-cliente-id").value = id;
     const docLabel = dni ? ` (${dni})` : "";
     $("#abono-cliente-nombre").value = `${nombre}${docLabel}`;
+    
+    $("#abono-fecha").value = new Date().toISOString().slice(0, 10);
+
     $("#abono-summary").innerHTML = `
         <strong>${escapeHtml(nombre)}</strong>
         <span>Saldo pendiente: ${money(saldo)}</span>
@@ -1426,6 +1424,10 @@ function closeGestion() {
     state.gestionTransportistaId = null;
     state.gestionEnvios = [];
     switchCarrierTab("pendientes");
+
+    if (typeof loadManagementLists === "function") {
+        loadManagementLists();
+    }
 }
 
 async function liquidarDeudaTransportista() {
@@ -1455,16 +1457,96 @@ async function liquidarDeudaTransportista() {
     }
 }
 
+let transportistasCache = [];
+
+const loadTransportistasForLookup = async () => {
+    try {
+        const response = await fetch('/api/transportistas'); // Asegúrate de tener una ruta que devuelva los transportistas
+        const data = await response.json();
+        transportistasCache = Array.isArray(data) ? data : (data.data || []);
+    } catch (e) {
+        console.error('Error cargando transportistas', e);
+    }
+};
+
+function initTransportistaSearch() {
+    const inputTrans = $("#f-transportista-search");
+    const dropdownTrans = $("#transportista-dropdown");
+    const inputTransId = $("#f-transportista-id");
+    const statusTrans = $("#transportista-status");
+
+    if (!inputTrans) return;
+
+    inputTrans.addEventListener("input", (e) => {
+        const query = e.target.value.toLowerCase().trim();
+        if (query.length < 1) {
+            dropdownTrans.innerHTML = "";
+            dropdownTrans.style.display = "none";
+            return;
+        }
+
+        const filtered = transportistasCache.filter(t => 
+            t.nombre.toLowerCase().includes(query) || 
+            (t.documento && t.documento.toLowerCase().includes(query))
+        ).slice(0, 5);
+
+        if (filtered.length === 0) {
+            dropdownTrans.innerHTML = '<div class="dropdown-item" style="padding: 8px; color: #94a3b8;">No se encontraron transportistas</div>';
+            dropdownTrans.style.display = "block";
+            return;
+        }
+
+        dropdownTrans.innerHTML = filtered.map(t => `
+            <div class="dropdown-item" data-id="${t.id}" data-nombre="${t.nombre}" style="padding: 8px; cursor: pointer; border-bottom: 1px solid var(--line);">
+                <strong style="color: var(--text);">${t.nombre}</strong><br>
+                <small style="color: var(--muted);">${t.documento || 'Sin doc'} - ${t.telefono || ''}</small>
+            </div>
+        `).join("");
+        dropdownTrans.style.display = "block";
+    });
+
+    dropdownTrans.addEventListener("click", (e) => {
+        const item = e.target.closest(".dropdown-item");
+        if (!item) return;
+        
+        const transportistaId = item.getAttribute("data-id");
+        const transportistaNombre = item.getAttribute("data-nombre");
+
+        if (!transportistaId) return;
+
+        // Asignar explícitamente al input oculto y al visible
+        $("#f-transportista-id").value = transportistaId;
+        $("#f-transportista-search").value = transportistaNombre;
+        
+        if (statusTrans) {
+            statusTrans.textContent = `Seleccionado: ${transportistaNombre}`;
+        }
+        
+        dropdownTrans.style.display = "none";
+        dropdownTrans.innerHTML = "";
+    });
+
+    document.addEventListener("click", (e) => {
+        if (!inputTrans.contains(e.target) && !dropdownTrans.contains(e.target)) {
+            dropdownTrans.style.display = "none";
+        }
+    });
+}
+
+
 async function searchClient() {
     const input = $("#f-cliente-search");
     const dropdown = $("#client-dropdown");
     const search = input.value.trim();
 
-    if (!search) {
+    if (search.length < 2) {
         hideClientNotFound();
         hideClientForm();
         clearSelectedClient(false);
         $("#dni-status").textContent = "";
+        dropdown.classList.remove("open");
+        dropdown.innerHTML = "";
+        return;
     }
 
     if (search && search !== $("#f-nombre").value.trim() && search !== $("#f-dni").value.trim()) {
@@ -1473,7 +1555,10 @@ async function searchClient() {
 
     try {
         const response = await api.get(`/clientes?search=${encodeURIComponent(search)}`);
-        if (!response.data.length) {
+        
+        const resultadosLimitados = response.data.slice(0, 5);
+
+        if (!resultadosLimitados.length) {
             dropdown.classList.remove("open");
             clearSelectedClient(false);
             showClientNotFound(search);
@@ -1481,7 +1566,8 @@ async function searchClient() {
         }
 
         hideClientNotFound();
-        dropdown.innerHTML = response.data.map((cliente) => `
+
+        dropdown.innerHTML = resultadosLimitados.map((cliente) => `
             <button type="button" data-id="${cliente.id}" data-dni="${escapeHtml(cliente.dni || "")}" data-tipo="${escapeHtml(cliente.tipo_documento || "")}" data-nombre="${escapeHtml(cliente.nombre)}" data-telefono="${escapeHtml(cliente.telefono || "")}" data-direccion="${escapeHtml(cliente.direccion || "")}">
                 <span>${escapeHtml(cliente.nombre)}</span>
                 <small>${cliente.dni ? (cliente.tipo_documento ? cliente.tipo_documento.toUpperCase() + ": " : "") + escapeHtml(cliente.dni) : "Sin documento"}</small>
@@ -1586,6 +1672,7 @@ async function saveEnvio(event) {
         }
         closeModal();
         loadEnvios();
+        if ($("#pending-amounts-list")) loadPendingAmounts();
     } catch (error) {
         showToast(error.message, "error");
     }
@@ -1806,6 +1893,7 @@ function envioPayload() {
         fecha: $("#f-fecha").value,
         cliente_id: parseInt($("#f-cliente-id").value, 10) || null,
         cliente: $("#f-nombre").value.trim(),
+        transportista_id: parseInt($("#f-transportista-id").value, 10) || null,
         telefono: $("#f-telefono").value.trim(),
         direccion: $("#f-direccion").value.trim(),
         guia: $("#f-guia") ? $("#f-guia").value.trim() : null,
@@ -1860,6 +1948,7 @@ function validate(payload) {
     let valid = true;
     const required = {
         "#f-cliente-search": payload.cliente_id && payload.cliente,
+        "#f-transportista-search": payload.transportista_id,
     };
 
     if ($("#f-guia")) {
@@ -2126,7 +2215,7 @@ function openAmountModal(id) {
     $("#amount-total").value = envio.monto && parseFloat(envio.monto) > 0 ? envio.monto : "";
 
     $("#amount-summary").innerHTML = `
-        <strong>${escapeHtml(envio.codigo)} - ${escapeHtml(envio.cliente || "Cliente")}</strong>
+       <strong>${escapeHtml(envio.codigo)} - ${escapeHtml(envio.cliente || "Cliente")}</strong>
     `;
 
     renderAmountItems(envio.items || []);
@@ -2238,6 +2327,13 @@ async function pagarTransportistaIndividual(id) {
         await api.patch(`/envios/${id}/pagar-transportista`);
         showToast("Pago al transportista registrado.");
         loadEnvios();
+
+        if (typeof currentTransportistaId !== 'undefined' && currentTransportistaId) {
+            loadEnviosPendientesTransportista(currentTransportistaId);
+        } else if (typeof loadTransportistasConDeuda === 'function') {
+            loadTransportistasConDeuda();
+        }
+
     } catch (error) {
         showToast(error.message, "error");
     }
@@ -2364,6 +2460,7 @@ function closeLiqModal() {
     document.body.style.overflow = "";
     state.liqEnvios = [];
     state.liqTransportistaId = null;
+    loadLiquidaciones();
 }
 
 async function liqAll() {

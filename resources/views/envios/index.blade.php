@@ -985,6 +985,7 @@
                     </div>
                 </div>
 
+                <!-- AHORA ITEMS ES EL 03 (Se ubicará a la izquierda debajo de Fecha) -->
                 <div class="form-section form-section-items-modal">
                     <div class="items-modal-header">
                         <h3>03 Items del envío</h3>
@@ -1009,8 +1010,24 @@
                     </div>
                 </div>
 
+                <!-- AHORA TRANSPORTISTA ES EL 04 (Se ubicará a la derecha debajo de Cliente) -->
                 <div class="form-section">
-                    <h3>04 Guía</h3>
+                    <h3>04 Transportista</h3>
+                    <input type="hidden" id="f-transportista-id">
+                    <input type="hidden" id="f-transportista-nombre">
+
+                    <div class="client-lookup">
+                        <label class="field-relative">
+                            <span>Transportista / búsqueda</span>
+                            <input type="text" id="f-transportista-search" autocomplete="off" placeholder="Buscar por nombre o documento">
+                            <div class="dropdown" id="transportista-dropdown"></div>
+                        </label>
+                    </div>
+                    <small id="transportista-status" style="color: var(--muted); margin-top: 4px; display: block;"></small>
+                </div>
+
+                <div class="form-section">
+                    <h3>05 Guía</h3>
                     <div class="form-grid two">
                         <label>
                             <span>Guía de remitente</span>
@@ -1020,7 +1037,7 @@
                 </div>
 
                 <div class="form-section">
-                    <h3>05 Observación</h3>
+                    <h3>06 Observación</h3>
                     <label>
                         <span>Observaciones</span>
                         <textarea id="f-obs" rows="2" placeholder="Notas internas del envio"></textarea>
@@ -1033,6 +1050,7 @@
                 </footer>
             </form>
         </section>
+
     </div>
 
     @can('users.manage')

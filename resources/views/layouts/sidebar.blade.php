@@ -35,9 +35,6 @@
             @can('envios.view')
                 <a class="sidebar-link {{ (request()->routeIs('sistema') && !request()->has('section')) || request()->query('section') === 'envios' ? 'active' : '' }}" href="{{ route('sistema', ['section' => 'envios']) }}">Envíos</a>
             @endcan
-            @can('envios.create')
-                <a class="sidebar-link {{ request()->routeIs('asignacion') ? 'active' : '' }}" href="{{ route('asignacion') }}">Asignación de Carga</a>
-            @endcan
         </div>
 
         @can('envios.amounts')

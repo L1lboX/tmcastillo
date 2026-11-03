@@ -19,11 +19,23 @@ class CuentaCorrienteController extends Controller
 
         $query = CuentaCorriente::query()
             ->with(['cliente', 'envio'])
-            ->when($clienteId !== '', fn ($q) => $q->where('cliente_id', (int) $clienteId))
-            ->when($tipo !== '', fn ($q) => $q->where('tipo', $tipo))
-            ->latest('id');
+            ->when($tipo !== '', fn ($q) => $q->where('tipo', $tipo));
 
-        $movimientos = $query->get()->map(fn (CuentaCorriente $cc) => $this->format($cc));
+        if ($clienteId !== '') {
+            $clienteIdInt = (int) $clienteId;
+            $query->where('cliente_id', $clienteIdInt);
+
+            $ultimoCorteId = CuentaCorriente::query()
+            ->where('cliente_id', $clienteIdInt)
+            ->where('saldo_acumulado', '<=', 0.00)
+            ->max('id');
+
+            if ($ultimoCorteId) {
+                $query->where('id', '>', $ultimoCorteId);
+            }
+        }
+
+        $movimientos = $query->orderBy('id', 'asc')->get()->map(fn (CuentaCorriente $cc) => $this->format($cc));
 
         return response()->json([
             'ok' => true,

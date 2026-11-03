@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Api\AsignacionCargaController;
 use App\Http\Controllers\Api\ClienteController;
 use App\Http\Controllers\Api\CuentaCorrienteController;
 use App\Http\Controllers\Api\EnvioController;
@@ -139,25 +138,6 @@ Route::middleware('auth')->prefix('api')->group(function (): void {
 
     Route::get('/dashboard/ganancias', [DashboardController::class, 'ganancias'])
         ->middleware('permission:envios.amounts');
-
-    Route::get('/asignacion-carga', [AsignacionCargaController::class, 'index'])
-        ->middleware('permission:envios.create');
-    Route::get('/asignacion-carga/{envio}', [AsignacionCargaController::class, 'show'])
-        ->middleware('permission:envios.create');
-    Route::post('/asignacion-carga/asignar', [AsignacionCargaController::class, 'asignar'])
-        ->middleware('permission:envios.create');
-    Route::post('/asignacion-carga/desasignar', [AsignacionCargaController::class, 'desasignar'])
-        ->middleware('permission:envios.create');
-    Route::post('/asignacion-carga/bulk', [AsignacionCargaController::class, 'bulkAsignar'])
-        ->middleware('permission:envios.create');
-    Route::post('/asignacion-carga/bulk-desasignar', [AsignacionCargaController::class, 'bulkDesasignar'])
-        ->middleware('permission:envios.create');
-    Route::post('/asignacion-carga/envio', [AsignacionCargaController::class, 'asignarEnvio'])
-        ->middleware('permission:envios.create');
-    Route::post('/asignacion-carga/split', [AsignacionCargaController::class, 'splitItem'])
-        ->middleware('permission:envios.create');
-    Route::post('/asignacion-carga/merge', [AsignacionCargaController::class, 'mergeItems'])
-    ->middleware('permission:envios.create');
 
     Route::get('/auditoria/transportistas', [AuditoriaPagoController::class, 'index']);
     Route::get('/transportistas/{transportista}/historial-pagos', [AuditoriaPagoController::class, 'porTransportista']);
