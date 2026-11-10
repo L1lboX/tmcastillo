@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'cliente_id',
     'envio_id',
+    'alquiler_id',
     'tipo',
     'monto',
     'saldo_acumulado',
@@ -24,6 +25,7 @@ class CuentaCorriente extends Model
         return [
             'cliente_id' => 'integer',
             'envio_id' => 'integer',
+            'alquiler_id' => 'integer',
             'fecha' => 'date:Y-m-d',
             'monto' => 'decimal:2',
             'saldo_acumulado' => 'decimal:2',
@@ -38,5 +40,10 @@ class CuentaCorriente extends Model
     public function envio(): BelongsTo
     {
         return $this->belongsTo(Envio::class);
+    }
+
+    public function alquiler(): BelongsTo
+    {
+        return $this->belongsTo(Alquiler::class, 'alquiler_id');
     }
 }

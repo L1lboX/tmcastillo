@@ -1,4 +1,5 @@
 import Chart from 'chart.js/auto';  
+
 const state = {
     envios: [],
     users: [],
@@ -14,6 +15,9 @@ const state = {
     liqTransportistaId: null,
     gestionTransportistaId: null,
     gestionEnvios: [],
+    maquinarias: [],
+    alquileres: [],
+    editingMaquinariaId: null,
     nextCode: "ENV-0001",
     editingId: null,
     editingUserId: null,
@@ -29,7 +33,16 @@ const state = {
         fecha_desde: "",
         fecha_hasta: "",
     },
+    alquilerFilters: {
+        q: "",
+        pago: "",
+        fecha_desde: "",
+        fecha_hasta: "",
+    }
 };
+
+let currentAbonoClientData = { id: null, nombre: '', deudaEnvios: 0, deudaAlquileres: 0, deudaTotal: 0 };
+let currentMovementTab = 'todos';
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -67,6 +80,7 @@ function showConfirmModal(message) {
         btnNo.addEventListener("click", onNo);
     });
 }
+
 const can = (permission) => (window.AppContext?.user?.permissions || []).includes(permission);
 const on = (selector, event, callback) => {
     const element = $(selector);
@@ -122,16 +136,44 @@ const api = {
     },
 };
 
-document.addEventListener("DOMContentLoaded", () => {
-    initLoginCanvas();
-    loadTransportistasForLookup();
-    initTransportistaSearch();
+document.addEventListener("DOMContentLoaded", async () => {
+    try {
+        initLoginCanvas();
+    } catch (e) {
+        console.warn("Canvas login no disponible", e);
+    }
+
+    try {
+        await loadTransportistasForLookup();
+        initTransportistaSearch();
+    } catch (e) {
+        console.warn("Error cargando transportistas para lookup", e);
+    }
+
     if (!$("#envio-form")) {
         return;
     }
 
-    bindEvents();
+    try {
+        bindEvents();
+    } catch (e) {
+        console.error("Error en bindEvents:", e);
+    }
+
+    try {
+        bindMaquinariaEvents();
+    } catch (e) {
+        console.error("Error en bindMaquinariaEvents:", e);
+    }
+
+    try {
+        bindAlquilerEvents();
+    } catch (e) {
+        console.error("Error en bindAlquilerEvents:", e);
+    }
+
     setToday();
+    
     const urlParams = new URLSearchParams(window.location.search);
     const initialSection = urlParams.get("section") || window.location.hash.replace("#", "");
 
@@ -142,9 +184,12 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
         showSection("envios");
     }
-    loadEnvios();
+
+    // Cargas iniciales asíncronas seguras
+    loadEnvios().catch(err => console.error("Error loadEnvios:", err));
+    
     if (can("clientes.manage") || can("transportistas.manage") || can("envios.create")) {
-        loadManagementLists();
+        loadManagementLists().catch(err => console.error("Error loadManagementLists:", err));
     }
 });
 
@@ -202,6 +247,9 @@ function bindEvents() {
     on("#sidebar-backdrop", "click", closeSidebarMenu);
 
     initSidebarGroups();
+
+    setupAbonoModalEvents();
+    setupMovementsTabs();
 
     const debouncedClientSearch = debounce(searchClient, 220);
 
@@ -365,6 +413,8 @@ function showSection(section) {
         montos: ["Montos", "Envios pendientes de liquidacion"],
         cuentas: ["Cuentas por cobrar", "Control de deudas y abonos"],
         auditoria: ["Auditoría Financiera", "Control y trazabilidad de ingresos y egresos"],
+        maquinarias: ["Maquinarias", "Registro y disponibilidad de unidades"],
+        alquileres: ["Alquileres", "Gestión de contratos y servicios de maquinaria"]
     };
 
     document.querySelectorAll("[data-page]").forEach((page) => {
@@ -384,33 +434,35 @@ function showSection(section) {
     }
 
     const [title, subtitle] = titles[section] || titles.envios;
-    $("#section-title").textContent = title;
-    $("#section-subtitle").textContent = subtitle;
+    if ($("#section-title")) $("#section-title").textContent = title;
+    if ($("#section-subtitle")) $("#section-subtitle").textContent = subtitle;
     closeSidebarMenu();
 
-    if (section === "clientes" || section === "transportistas") {
-        loadManagementLists();
-        if (section === "transportistas") {
-            closeGestion();
+    try {
+        if (section === "clientes" || section === "transportistas") {
+            loadManagementLists();
+            if (section === "transportistas") {
+                closeGestion();
+            }
+        } else if (section === "roles") {
+            loadRoles();
+        } else if (section === "montos") {
+            loadPendingAmounts();
+        } else if (section === "cuentas") {
+            loadDebtClients();
+        } else if (section === "auditoria") {
+            initAuditoriaFinanciera();
+        } else if (section === "dashboard") {
+            loadDashboardGanancias();
+        } else if (section === "usuarios") {
+            loadUsers();
+        } else if (section === "maquinarias") {
+            loadMaquinarias();
+        } else if (section === "alquileres") {
+            loadAlquileres();
         }
-    }
-    if (section === "roles") {
-        loadRoles();
-    }
-    if (section === "montos") {
-        loadPendingAmounts();
-    }
-    if (section === "cuentas") {
-        loadDebtClients();
-    }
-    if (section === "auditoria") {
-        initAuditoriaFinanciera();
-    }
-    if (section === "dashboard") {
-        loadDashboardGanancias();
-    }
-    if (section === "usuarios") {
-        loadUsers();
+    } catch (err) {
+        console.error(`Error al activar sección ${section}:`, err);
     }
 }
 
@@ -459,7 +511,6 @@ function toggleSidebarGroup(groupName) {
     savedState[groupName] = !group.classList.contains("collapsed");
     localStorage.setItem("sidebarGroups", JSON.stringify(savedState));
 }
-
 
 function setFilter(key, value) {
     state.filters[key] = value;
@@ -544,7 +595,6 @@ function renderTable() {
     tbody.querySelectorAll("[data-amount]").forEach((button) => {
         button.addEventListener("click", () => openAmountModal(Number(button.dataset.amount)));
     });
-
     tbody.querySelectorAll("[data-delete]").forEach((button) => {
         button.addEventListener("click", () => deleteEnvio(Number(button.dataset.delete)));
     });
@@ -561,7 +611,6 @@ function renderPagination() {
     }
 
     let html = '<div class="pagination">';
-
     html += `<button class="pagination-btn" data-page="1" ${page === 1 ? "disabled" : ""}>&laquo;</button>`;
     html += `<button class="pagination-btn" data-page="${page - 1}" ${page <= 1 ? "disabled" : ""}>&lsaquo;</button>`;
 
@@ -587,7 +636,6 @@ function renderPagination() {
     html += "</div>";
 
     container.innerHTML = html;
-
     container.querySelectorAll(".pagination-btn:not([disabled])").forEach((btn) => {
         btn.addEventListener("click", () => goToPage(Number(btn.dataset.page)));
     });
@@ -675,25 +723,51 @@ function openAbonoModal() {
     $("#abono-form").reset();
     $("#abono-cliente-id").value = "";
     $("#abono-cliente-nombre").value = "";
-    $("#abono-fecha").value = new Date().toISOString().slice(0, 10);
+   const inputAbonoFecha = $("#abono-fecha");
+    if (inputAbonoFecha && !inputAbonoFecha.value) {
+        inputAbonoFecha.value = new Date().toISOString().slice(0, 10);
+    }
     $("#abono-summary").innerHTML = '<small>Selecciona un cliente de la lista para registrar un abono.</small>';
     $("#abono-modal").classList.add("open");
     $("#abono-modal").setAttribute("aria-hidden", "false");
     document.body.style.overflow = "hidden";
 }
 
-function openAbonoModalForClient(id, dni, nombre, saldo) {
-    state.selectedDebtClient = { id, dni, nombre, saldo };
-    $("#abono-cliente-id").value = id;
-    const docLabel = dni ? ` (${dni})` : "";
-    $("#abono-cliente-nombre").value = `${nombre}${docLabel}`;
-    
-    $("#abono-fecha").value = new Date().toISOString().slice(0, 10);
+function openAbonoModalForClient(id, dni, nombre, saldoTotal) {
+    const clienteData = state.debtClients.find(c => c.id === id);
 
-    $("#abono-summary").innerHTML = `
-        <strong>${escapeHtml(nombre)}</strong>
-        <span>Saldo pendiente: ${money(saldo)}</span>
-    `;
+    currentAbonoClientData = {
+        id: id,
+        nombre: nombre,
+        deudaEnvios: Number(clienteData?.deuda_envios ?? saldoTotal),
+        deudaAlquileres: Number(clienteData?.deuda_alquileres ?? 0),
+        deudaTotal: Number(saldoTotal)
+    };
+
+    $("#abono-cliente-id").value = id;
+    $("#abono-card-nombre").textContent = `${nombre} ${dni ? `(${dni})` : ''}`;
+    const inputAbonoFecha = $("#abono-fecha");
+    if (inputAbonoFecha && !inputAbonoFecha.value) {
+        inputAbonoFecha.value = new Date().toISOString().slice(0, 10);
+    }
+    $("#abono-monto").value = '';
+    $("#abono-observacion").value = '';
+    if ($("#abono-metodo-pago")) $("#abono-metodo-pago").value = "Efectivo";
+
+    $("#abono-sub-envios").textContent = money(currentAbonoClientData.deudaEnvios);
+    $("#abono-sub-alquileres").textContent = money(currentAbonoClientData.deudaAlquileres);
+
+    const selectOrigen = $("#abono-origen");
+    if (selectOrigen) {
+        if (currentAbonoClientData.deudaEnvios <= 0 && currentAbonoClientData.deudaAlquileres > 0) {
+            selectOrigen.value = 'alquileres';
+        } else {
+            selectOrigen.value = 'envios';
+        }
+    }
+
+    actualizarCardSaldosAbono();
+
     $("#abono-modal").classList.add("open");
     $("#abono-modal").setAttribute("aria-hidden", "false");
     document.body.style.overflow = "hidden";
@@ -711,8 +785,10 @@ async function saveAbono(event) {
 
     const payload = {
         cliente_id: parseInt($("#abono-cliente-id").value, 10),
+        origen: $("#abono-origen").value,
         monto: $("#abono-monto").value,
         fecha: $("#abono-fecha").value,
+        metodo_pago: $("#abono-metodo-pago").value,
         observacion: $("#abono-observacion").value.trim() || null,
     };
 
@@ -752,10 +828,7 @@ function renderDebtClients() {
     }
 
     list.innerHTML = state.debtClients.map((cliente) => {
-        let docDisplay = "-";
-        if (cliente.dni) {
-            docDisplay = escapeHtml(cliente.dni);
-        }
+        let docDisplay = cliente.dni ? escapeHtml(cliente.dni) : "-";
         return `
         <tr>
             <td class="cell-code">${docDisplay}</td>
@@ -809,10 +882,7 @@ function filterDebtClients(search) {
     }
 
     list.innerHTML = filtered.map((cliente) => {
-        let docDisplay = "-";
-        if (cliente.dni) {
-            docDisplay = escapeHtml(cliente.dni);
-        }
+        let docDisplay = cliente.dni ? escapeHtml(cliente.dni) : "-";
         return `
         <tr>
             <td class="cell-code">${docDisplay}</td>
@@ -846,12 +916,35 @@ function filterDebtClients(search) {
 
 async function openMovementsModal(id) {
     const cliente = state.debtClients.find((c) => c.id === id);
-    const docInfo = cliente && cliente.dni ? ` (${cliente.dni})` : "";
     $("#movements-modal-title").textContent = cliente ? `Movimientos de ${cliente.nombre}` : "Movimientos del cliente";
+    
     $("#movements-summary").innerHTML = cliente
-        ? `<strong>${escapeHtml(cliente.nombre)}</strong><span>${cliente.dni ? "Documento: " + escapeHtml(cliente.dni) + " · " : ""}Saldo pendiente: ${money(cliente.saldo_pendiente)}</span>`
+        ? `
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <div>
+                    <strong style="font-size: 1.05rem;">${escapeHtml(cliente.nombre)}</strong>
+                    <div style="color: var(--muted); font-size: 0.8rem; margin-top: 2px;">
+                        ${cliente.dni ? "Doc: " + escapeHtml(cliente.dni) + " · " : ""}Tel: ${escapeHtml(cliente.telefono || "-")}
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <span style="font-size: 0.8rem; color: var(--muted); display: block;">Deuda Total Consolidada</span>
+                    <strong style="color: #f59e0b; font-size: 1.25rem; font-family: 'Outfit', sans-serif;">${money(cliente.saldo_pendiente)}</strong>
+                </div>
+            </div>
+          `
         : "";
-    $("#movements-modal-list").innerHTML = `<tr><td class="empty-state" colspan="6">Cargando...</td></tr>`;
+
+    $("#movements-modal-list").innerHTML = `<tr><td class="empty-state" colspan="6">Cargando movimientos...</td></tr>`;
+    
+    currentMovementTab = 'todos';
+    const btnTodos = $("#tab-mov-todos");
+    if (btnTodos) {
+        btnTodos.style.background = 'var(--accent)';
+        btnTodos.style.color = '#000';
+        btnTodos.style.fontWeight = '700';
+    }
+
     $("#movements-modal").classList.add("open");
     $("#movements-modal").setAttribute("aria-hidden", "false");
     document.body.style.overflow = "hidden";
@@ -876,22 +969,49 @@ function renderDebtMovementsInModal() {
     const list = $("#movements-modal-list");
     if (!list) return;
 
-    if (!state.debtMovements.length) {
-        list.innerHTML = `<tr><td class="empty-state" colspan="6">No hay movimientos registrados.</td></tr>`;
+    let movimientos = state.debtMovements || [];
+
+    if (currentMovementTab === 'envios') {
+        movimientos = movimientos.filter(m => m.envio_id !== null || (m.observacion && m.observacion.includes('[ENVIOS]')));
+    } else if (currentMovementTab === 'alquileres') {
+        movimientos = movimientos.filter(m => m.alquiler_id !== null || (m.observacion && m.observacion.includes('[ALQUILERES]')));
+    }
+
+    if (!movimientos.length) {
+        list.innerHTML = `<tr><td class="empty-state" colspan="6" style="padding: 2rem; text-align: center; color: var(--muted);">No hay movimientos en esta categoría.</td></tr>`;
         return;
     }
 
-    list.innerHTML = state.debtMovements.map((mov) => {
+    list.innerHTML = movimientos.map((mov) => {
         const tipoClass = mov.tipo === "cargo" ? "contra" : "pagado";
         const tipoLabel = mov.tipo === "cargo" ? "Cargo" : "Abono";
+
+        let origenBadge = '-';
+        if (mov.envio_codigo) {
+            origenBadge = `<span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">Envío ${escapeHtml(mov.envio_codigo)}</span>`;
+        } else if (mov.alquiler_id) {
+            const placa = mov.alquiler_placa ? ` · ${escapeHtml(mov.alquiler_placa)}` : '';
+            origenBadge = `<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3);">Alq. #${mov.alquiler_id}${placa}</span>`;
+        } else if (mov.tipo === 'abono') {
+            if (mov.observacion && mov.observacion.includes('[ALQUILERES]')) {
+                origenBadge = `<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;">Abono Máquina</span>`;
+            } else {
+                origenBadge = `<span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">Abono Envío</span>`;
+            }
+        }
+
+        const montoDisplay = mov.tipo === "cargo" 
+            ? `<span style="color: var(--danger); font-weight: 700;">+ ${money(mov.monto)}</span>`
+            : `<span style="color: var(--success); font-weight: 700;">- ${money(mov.monto)}</span>`;
+
         return `
             <tr>
                 <td class="cell-muted">${formatDate(mov.fecha)}</td>
                 <td><span class="badge ${tipoClass}">${tipoLabel}</span></td>
-                <td class="cell-code">${escapeHtml(mov.envio_codigo || "-")}</td>
-                <td class="cell-code">${money(mov.monto)}</td>
-                <td class="cell-code">${money(mov.saldo_acumulado)}</td>
-                <td class="cell-muted">${escapeHtml(mov.observacion || "-")}</td>
+                <td>${origenBadge}</td>
+                <td class="cell-code">${montoDisplay}</td>
+                <td class="cell-code" style="font-weight: 600;">${money(mov.saldo_acumulado)}</td>
+                <td class="cell-muted" style="font-size: 0.82rem;">${escapeHtml(mov.observacion || "-")}</td>
             </tr>
         `;
     }).join("");
@@ -918,13 +1038,22 @@ function resetForm() {
 function setToday() {
     const today = new Date();
     const iso = today.toISOString().slice(0, 10);
-    $("#f-fecha").value = iso;
-    $("#current-date").textContent = today.toLocaleDateString("es-PE", {
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-    });
+    const inputFecha = $("#f-fecha");
+    
+    // Solo asignamos la fecha de hoy si el campo está vacío
+    if (inputFecha && !inputFecha.value) {
+        inputFecha.value = iso;
+    }
+    
+    const labelCurrent = $("#current-date");
+    if (labelCurrent) {
+        labelCurrent.textContent = today.toLocaleDateString("es-PE", {
+            weekday: "short",
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+        });
+    }
 }
 
 async function saveClient() {
@@ -1193,8 +1322,6 @@ function renderGestionEnvios() {
 
     const envios = state.gestionEnvios || [];
     const estados = ["Registrado", "En camino", "Entregado", "Devuelto"];
-
-    // Filtrar estrictamente por si no está pagado (sin importar si el costo es 0)
     const enviosPendientes = envios.filter((e) => !e.pagado_transportista_at);
 
     if (!enviosPendientes.length) {
@@ -1259,9 +1386,6 @@ function renderGestionEnvios() {
     });
 }
 
-// ==========================================
-// AUDITORÍA Y HISTORIAL DE TRANSPORTISTAS
-// ==========================================
 let carrierPagosCurrentPage = 1;
 let carrierPagosLastPage = 1;
 
@@ -1327,7 +1451,6 @@ async function cargarHistorialPagosCarrier(page = 1) {
         carrierPagosCurrentPage = paginacion.current_page;
         carrierPagosLastPage = paginacion.last_page;
 
-        // Actualizar paginador
         const totalText = $("#carrier-pagos-total-text");
         if (totalText) {
             totalText.textContent = `Página ${paginacion.current_page} de ${paginacion.last_page || 1} (${paginacion.total} pagos registrados)`;
@@ -1369,7 +1492,6 @@ async function cargarHistorialPagosCarrier(page = 1) {
             `;
         }).join("");
 
-        // Eventos a botones de "Ver detalle"
         list.querySelectorAll(".btn-ver-pago-items").forEach(btn => {
             btn.addEventListener("click", () => {
                 const pago = JSON.parse(btn.getAttribute("data-pago"));
@@ -1461,7 +1583,7 @@ let transportistasCache = [];
 
 const loadTransportistasForLookup = async () => {
     try {
-        const response = await fetch('/api/transportistas'); // Asegúrate de tener una ruta que devuelva los transportistas
+        const response = await fetch('/api/transportistas');
         const data = await response.json();
         transportistasCache = Array.isArray(data) ? data : (data.data || []);
     } catch (e) {
@@ -1472,7 +1594,6 @@ const loadTransportistasForLookup = async () => {
 function initTransportistaSearch() {
     const inputTrans = $("#f-transportista-search");
     const dropdownTrans = $("#transportista-dropdown");
-    const inputTransId = $("#f-transportista-id");
     const statusTrans = $("#transportista-status");
 
     if (!inputTrans) return;
@@ -1514,7 +1635,6 @@ function initTransportistaSearch() {
 
         if (!transportistaId) return;
 
-        // Asignar explícitamente al input oculto y al visible
         $("#f-transportista-id").value = transportistaId;
         $("#f-transportista-search").value = transportistaNombre;
         
@@ -1532,7 +1652,6 @@ function initTransportistaSearch() {
         }
     });
 }
-
 
 async function searchClient() {
     const input = $("#f-cliente-search");
@@ -1555,7 +1674,6 @@ async function searchClient() {
 
     try {
         const response = await api.get(`/clientes?search=${encodeURIComponent(search)}`);
-        
         const resultadosLimitados = response.data.slice(0, 5);
 
         if (!resultadosLimitados.length) {
@@ -2210,8 +2328,6 @@ function openAmountModal(id) {
     $("#amount-form").reset();
     $("#amount-envio-id").value = id;
     $("#amount-payment").value = envio.pago && envio.pago !== "Pendiente" ? envio.pago : "Credito";
-
-    // Si ya existe monto cobrado al cliente, se mantiene; si no, queda vacío para asignarlo
     $("#amount-total").value = envio.monto && parseFloat(envio.monto) > 0 ? envio.monto : "";
 
     $("#amount-summary").innerHTML = `
@@ -2235,7 +2351,6 @@ function renderAmountItems(items) {
     }
 
     container.innerHTML = items.map((item, index) => {
-        // Lee primero costo_transportista; si no existe, recurre a monto
         const valorFlete = parseFloat(item.costo_transportista) || parseFloat(item.monto) || 0;
         const valorDisplay = valorFlete > 0 ? valorFlete.toFixed(2) : '';
 
@@ -2303,178 +2418,6 @@ async function saveAmount(event) {
         showToast("Monto guardado correctamente.");
         loadEnvios();
         if ($("#pending-amounts-list")) loadPendingAmounts();
-    } catch (error) {
-        showToast(error.message, "error");
-    }
-}
-
-async function cambiarEstadoEnvio(id, estado) {
-    try {
-        await api.patch(`/envios/${id}/estado`, { estado });
-        showToast(`Estado actualizado a "${estado}".`);
-        loadEnvios();
-    } catch (error) {
-        showToast(error.message, "error");
-        loadEnvios();
-    }
-}
-
-async function pagarTransportistaIndividual(id) {
-    const confirmed = await showConfirmModal("¿Marcar este envío como pagado al transportista?");
-    if (!confirmed) return;
-
-    try {
-        await api.patch(`/envios/${id}/pagar-transportista`);
-        showToast("Pago al transportista registrado.");
-        loadEnvios();
-
-        if (typeof currentTransportistaId !== 'undefined' && currentTransportistaId) {
-            loadEnviosPendientesTransportista(currentTransportistaId);
-        } else if (typeof loadTransportistasConDeuda === 'function') {
-            loadTransportistasConDeuda();
-        }
-
-    } catch (error) {
-        showToast(error.message, "error");
-    }
-}
-
-async function loadLiquidaciones() {
-    if (!$("#liquidaciones-list")) return;
-
-    try {
-        const response = await api.get("/transportistas-con-deuda");
-        state.liquidaciones = response.data;
-        renderLiquidaciones();
-    } catch (error) {
-        showToast(error.message, "error");
-    }
-}
-
-function renderLiquidaciones() {
-    const list = $("#liquidaciones-list");
-    if (!list) return;
-
-    const data = state.liquidaciones;
-
-    const countEl = $("#liq-transportista-count");
-    const totalEl = $("#liq-total-amount");
-    if (countEl) countEl.textContent = data.length;
-    if (totalEl) totalEl.textContent = money(data.reduce((sum, t) => sum + Number(t.deuda_total || 0), 0));
-
-    if (!data.length) {
-        list.innerHTML = `<tr><td class="empty-state" colspan="6">No hay transportistas con deuda pendiente.</td></tr>`;
-        return;
-    }
-
-    list.innerHTML = data.map((t) => `
-        <tr>
-            <td><strong>${escapeHtml(t.nombre)}</strong></td>
-            <td class="cell-code">${escapeHtml(t.documento || "-")}</td>
-            <td class="cell-muted">${escapeHtml(t.telefono || "-")}</td>
-            <td class="cell-code">${t.envios_pendientes}</td>
-            <td class="cell-code">${money(t.deuda_total)}</td>
-            <td>
-                <div class="row-actions">
-                    <button class="button button-primary button-with-icon" type="button" data-liq-ver="${t.id}"><span class="material-icon">visibility</span>Ver envíos</button>
-                </div>
-            </td>
-        </tr>
-    `).join("");
-
-    list.querySelectorAll("[data-liq-ver]").forEach((button) => {
-        button.addEventListener("click", () => openLiqModal(Number(button.dataset.liqVer)));
-    });
-}
-
-async function openLiqModal(transportistaId) {
-    state.liqTransportistaId = transportistaId;
-
-    try {
-        const response = await api.get(`/transportistas/${transportistaId}/envios-pendientes`);
-        state.liqEnvios = response.data;
-        renderLiqModal();
-        $("#liq-modal").classList.add("open");
-        $("#liq-modal").setAttribute("aria-hidden", "false");
-        document.body.style.overflow = "hidden";
-    } catch (error) {
-        showToast(error.message, "error");
-    }
-}
-
-function renderLiqModal() {
-    const list = $("#liq-modal-list");
-    const summary = $("#liq-summary");
-    if (!list) return;
-
-    const data = state.liqEnvios;
-    const transportista = state.liquidaciones.find((t) => t.id === state.liqTransportistaId);
-    const nombreTransportista = transportista?.nombre || "Transportista";
-
-    $("#liq-modal-title").textContent = `Envíos pendientes - ${nombreTransportista}`;
-
-    const total = data.reduce((sum, e) => sum + Number(e.costo_transportista || 0), 0);
-    summary.innerHTML = `
-        <strong>${data.length} envío(s) pendiente(s)</strong>
-        <span>Total a pagar: ${money(total)}</span>
-    `;
-
-    if (!data.length) {
-        list.innerHTML = `<tr><td class="empty-state" colspan="7">No hay envíos pendientes.</td></tr>`;
-        return;
-    }
-
-    list.innerHTML = data.map((envio) => {
-        const itemsSummary = envio.items ? envio.items.map(i => `${i.cantidad}x`).join(', ') : '-';
-        return `
-        <tr>
-            <td class="cell-code">${escapeHtml(envio.codigo)}</td>
-            <td class="cell-muted">${formatDate(envio.fecha)}</td>
-            <td><strong>${escapeHtml(envio.cliente || "-")}</strong></td>
-            <td>${itemsSummary}</td>
-            <td class="cell-code">${money(envio.costo_transportista)}</td>
-            <td>
-                <button class="button button-primary button-with-icon" type="button" data-liq-pagar="${envio.id}" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;"><span class="material-icon" style="font-size: 1rem;">local_atm</span>Pagar</button>
-            </td>
-        </tr>
-    `}).join("");
-
-    list.querySelectorAll("[data-liq-pagar]").forEach((button) => {
-        button.addEventListener("click", async () => {
-            try {
-                await api.patch(`/envios/${button.dataset.liqPagar}/pagar-transportista`);
-                showToast("Pago registrado.");
-                openLiqModal(state.liqTransportistaId);
-                loadLiquidaciones();
-                loadEnvios();
-            } catch (error) {
-                showToast(error.message, "error");
-            }
-        });
-    });
-}
-
-function closeLiqModal() {
-    $("#liq-modal").classList.remove("open");
-    $("#liq-modal").setAttribute("aria-hidden", "true");
-    document.body.style.overflow = "";
-    state.liqEnvios = [];
-    state.liqTransportistaId = null;
-    loadLiquidaciones();
-}
-
-async function liqAll() {
-    if (!state.liqTransportistaId) return;
-
-    const confirmed = await showConfirmModal("¿Liquidar todos los envíos pendientes de este transportista?");
-    if (!confirmed) return;
-
-    try {
-        const response = await api.post("/envios/pagar-transportista-lote", { transportista_id: state.liqTransportistaId });
-        showToast(`${response.data.pagados} envío(s) liquidado(s).`);
-        closeLiqModal();
-        loadLiquidaciones();
-        loadEnvios();
     } catch (error) {
         showToast(error.message, "error");
     }
@@ -2748,6 +2691,518 @@ async function deleteUser(id) {
     }
 }
 
+/* ==========================================================================
+   3. MÓDULO MAQUINARIAS
+   ========================================================================== */
+function bindMaquinariaEvents() {
+    on("#btn-open-maquinaria-modal", "click", () => openMaquinariaModal());
+    on("#btn-close-maquinaria-modal", "click", closeMaquinariaModal);
+    on("#btn-cancel-maquinaria-modal", "click", closeMaquinariaModal);
+    on("#maquinaria-form", "submit", saveMaquinaria);
+
+    $("#maquinaria-search")?.addEventListener("input", debounce((e) => {
+        const query = e.target.value.toLowerCase().trim();
+        const filtered = state.maquinarias.filter(m => 
+            m.placa.toLowerCase().includes(query) || 
+            m.descripcion.toLowerCase().includes(query)
+        );
+        renderMaquinariasTable(filtered);
+    }, 250));
+
+    $("#maquinaria-modal")?.addEventListener("click", (event) => {
+        if (event.target.id === "maquinaria-modal") closeMaquinariaModal();
+    });
+}
+
+async function loadMaquinarias() {
+    if (!$("#maquinarias-list")) return;
+
+    try {
+        const response = await api.get("/maquinarias");
+        state.maquinarias = response.data;
+        renderMaquinariasTable(state.maquinarias);
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+function renderMaquinariasTable(items) {
+    const list = $("#maquinarias-list");
+    if (!list) return;
+
+    if (!items.length) {
+        list.innerHTML = `<tr><td class="empty-state" colspan="5">No hay maquinarias registradas.</td></tr>`;
+        return;
+    }
+
+    list.innerHTML = items.map((m) => `
+        <tr>
+            <td class="cell-code">${m.id}</td>
+            <td><strong>${escapeHtml(m.placa)}</strong></td>
+            <td>${escapeHtml(m.descripcion)}</td>
+            <td><span class="badge ${m.activo ? "pagado" : "contra"}">${m.activo ? "Activo" : "Inactivo"}</span></td>
+            <td style="text-align: right;">
+                <div class="row-actions" style="justify-content: flex-end;">
+                    <span class="material-icon" data-maquinaria-edit="${m.id}" title="Editar" role="button" tabindex="0" aria-label="Editar maquinaria">edit</span>
+                    <span class="material-icon" data-maquinaria-toggle="${m.id}" title="${m.activo ? "Desactivar" : "Activar"}" role="button" tabindex="0" aria-label="${m.activo ? "Desactivar maquinaria" : "Activar maquinaria"}">${m.activo ? "toggle_off" : "toggle_on"}</span>
+                </div>
+            </td>
+        </tr>
+    `).join("");
+
+    list.querySelectorAll("[data-maquinaria-edit]").forEach((button) => {
+        button.addEventListener("click", () => editMaquinaria(Number(button.dataset.maquinariaEdit)));
+    });
+    list.querySelectorAll("[data-maquinaria-toggle]").forEach((button) => {
+        button.addEventListener("click", () => toggleMaquinariaActive(Number(button.dataset.maquinariaToggle)));
+    });
+}
+
+function openMaquinariaModal() {
+    $("#maquinaria-form").reset();
+    $("#maquinaria-id").value = "";
+    state.editingMaquinariaId = null;
+    $("#maquinaria-modal-title").textContent = "Registrar maquinaria";
+    $("#maquinaria-modal").classList.add("open");
+    $("#maquinaria-modal").setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+}
+
+function closeMaquinariaModal() {
+    $("#maquinaria-modal").classList.remove("open");
+    $("#maquinaria-modal").setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+    state.editingMaquinariaId = null;
+}
+
+function editMaquinaria(id) {
+    const item = state.maquinarias.find((m) => m.id === id);
+    if (!item) return;
+
+    openMaquinariaModal();
+    state.editingMaquinariaId = id;
+    $("#maquinaria-modal-title").textContent = "Editar maquinaria";
+    $("#maquinaria-id").value = item.id;
+    $("#maquinaria-placa").value = item.placa;
+    $("#maquinaria-descripcion").value = item.descripcion;
+}
+
+async function saveMaquinaria(event) {
+    event.preventDefault();
+
+    const payload = {
+        placa: $("#maquinaria-placa").value.trim().toUpperCase(),
+        descripcion: $("#maquinaria-descripcion").value.trim(),
+    };
+
+    if (!payload.placa || !payload.descripcion) {
+        showToast("Completa la placa y la descripción.", "error");
+        return;
+    }
+
+    try {
+        if (state.editingMaquinariaId) {
+            await api.put(`/maquinarias/${state.editingMaquinariaId}`, payload);
+            showToast("Maquinaria actualizada correctamente.");
+        } else {
+            await api.post("/maquinarias", payload);
+            showToast("Maquinaria registrada correctamente.");
+        }
+        closeMaquinariaModal();
+        loadMaquinarias();
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+async function toggleMaquinariaActive(id) {
+    try {
+        const response = await api.patch(`/maquinarias/${id}/toggle`);
+        const item = response.data;
+        showToast(`Maquinaria ${item.activo ? "activada" : "desactivada"}.`);
+        loadMaquinarias();
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+/* ==========================================================================
+   4. MÓDULO ALQUILERES
+   ========================================================================== */
+function bindAlquilerEvents() {
+    on("#btn-open-alquiler-modal", "click", openAlquilerModal);
+    on("#btn-close-alquiler-modal", "click", closeAlquilerModal);
+    on("#btn-cancel-alquiler", "click", closeAlquilerModal);
+    on("#btn-close-alquiler-details", "click", closeAlquilerDetailsModal);
+    on("#alquiler-form", "submit", saveAlquiler);
+
+    $("#alquiler-modal")?.addEventListener("click", (event) => {
+        if (event.target.id === "alquiler-modal") closeAlquilerModal();
+    });
+    $("#alquiler-details-modal")?.addEventListener("click", (event) => {
+        if (event.target.id === "alquiler-details-modal") closeAlquilerDetailsModal();
+    });
+
+    on("#alquiler-tiempo", "input", calcularPreviewAlquiler);
+    on("#alquiler-precio", "input", calcularPreviewAlquiler);
+    on("#alquiler-estado-pago", "change", toggleMetodoPagoAlquiler);
+
+    // Filtros de Alquileres
+    $("#btn-toggle-alquiler-filters")?.addEventListener("click", () => {
+        const panel = $("#alquiler-filter-panel");
+        const btn = $("#btn-toggle-alquiler-filters");
+        const open = panel.classList.toggle("open");
+        btn.setAttribute("aria-expanded", String(open));
+    });
+
+    $("#btn-clear-alquiler-filters")?.addEventListener("click", clearAlquilerFilters);
+    $("#alquiler-search-input")?.addEventListener("input", debounce((e) => {
+        state.alquilerFilters.q = e.target.value.trim();
+        loadAlquileres();
+    }, 250));
+    $("#filter-alquiler-desde")?.addEventListener("change", (e) => {
+        state.alquilerFilters.fecha_desde = e.target.value;
+        loadAlquileres();
+    });
+    $("#filter-alquiler-hasta")?.addEventListener("change", (e) => {
+        state.alquilerFilters.fecha_hasta = e.target.value;
+        loadAlquileres();
+    });
+    $("#filter-alquiler-pago")?.addEventListener("change", (e) => {
+        state.alquilerFilters.pago = e.target.value;
+        loadAlquileres();
+    });
+
+    initAlquilerAutocompleteMaquinaria();
+    initAlquilerAutocompleteCliente();
+}
+
+function clearAlquilerFilters() {
+    state.alquilerFilters = { q: "", pago: "", fecha_desde: "", fecha_hasta: "" };
+    if ($("#alquiler-search-input")) $("#alquiler-search-input").value = "";
+    if ($("#filter-alquiler-desde")) $("#filter-alquiler-desde").value = "";
+    if ($("#filter-alquiler-hasta")) $("#filter-alquiler-hasta").value = "";
+    if ($("#filter-alquiler-pago")) $("#filter-alquiler-pago").value = "";
+    loadAlquileres();
+}
+
+async function loadAlquileres(page = 1) {
+    if (!$("#alquileres-tbody")) return;
+
+    const params = new URLSearchParams({ page, per_page: 15 });
+    if (state.alquilerFilters.q) params.set("search", state.alquilerFilters.q);
+    if (state.alquilerFilters.pago) params.set("estado_pago", state.alquilerFilters.pago);
+    if (state.alquilerFilters.fecha_desde) params.set("fecha_desde", state.alquilerFilters.fecha_desde);
+    if (state.alquilerFilters.fecha_hasta) params.set("fecha_hasta", state.alquilerFilters.fecha_hasta);
+
+    try {
+        const response = await api.get(`/alquileres?${params.toString()}`);
+        state.alquileres = response.data;
+        renderAlquileresTable();
+        if (response.meta) {
+            renderAuditPagination("alquileres-pagination", response.meta, (newPage) => loadAlquileres(newPage));
+        }
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+function renderAlquileresTable() {
+    const tbody = $("#alquileres-tbody");
+    if (!tbody) return;
+
+    if (!state.alquileres.length) {
+        tbody.innerHTML = `<tr><td class="empty-state" colspan="7">No hay registros de alquileres.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = state.alquileres.map((a) => {
+        // Mapeo exacto a las columnas de tu Base de Datos
+        const estado = a.cuenta || "-"; 
+        const badgeClass = estado === "Cobrado" ? "pagado" : "contra";
+        const fecha = a.dia || a.fecha;
+        const total = a.importe_proyecto || 0;
+
+        return `
+            <tr>
+                <td class="cell-code">#${a.id}</td>
+                <td class="cell-muted">${formatDate(fecha)}</td>
+                <td><strong>${escapeHtml(a.cliente?.nombre || a.cliente_nombre || "-")}</strong></td>
+                <td><span class="cell-code">${escapeHtml(a.maquinaria?.placa || a.maquinaria_placa || "-")}</span></td>
+                <td class="col-hide-mob"><span class="badge ${badgeClass}">${escapeHtml(estado)}</span></td>
+                <td class="col-hide-mob cell-code"><strong>${money(total)}</strong></td>
+                <td>
+                    <div class="row-actions">
+                        <span class="material-icon" data-alquiler-details="${a.id}" title="Ver detalle" role="button" tabindex="0" aria-label="Ver detalle de alquiler">visibility</span>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join("");
+
+    tbody.querySelectorAll("[data-alquiler-details]").forEach((button) => {
+        button.addEventListener("click", () => showAlquilerDetails(Number(button.dataset.alquilerDetails)));
+    });
+}
+
+function openAlquilerModal() {
+    $("#alquiler-form").reset();
+    $("#alquiler-db-id").value = "";
+    $("#alquiler-cliente-id").value = "";
+    $("#alquiler-maquinaria-id").value = "";
+    
+    // Captura fecha de hoy automática
+    const inputAlquilerFecha = $("#alquiler-fecha");
+    if (inputAlquilerFecha && !inputAlquilerFecha.value) {
+        inputAlquilerFecha.value = new Date().toISOString().slice(0, 10);
+    }
+    $("#alquiler-preview-importe").value = "0.00";
+    $("#alquiler-cliente-status").textContent = "";
+    $("#alquiler-maquinaria-status").textContent = "";
+
+    toggleMetodoPagoAlquiler();
+
+    $("#alquiler-modal").classList.add("open");
+    $("#alquiler-modal").setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+}
+
+function closeAlquilerModal() {
+    $("#alquiler-modal").classList.remove("open");
+    $("#alquiler-modal").setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+    closeDropdowns();
+}
+
+function calcularPreviewAlquiler() {
+    const tiempo = parseFloat($("#alquiler-tiempo")?.value) || 0;
+    const precio = parseFloat($("#alquiler-precio")?.value) || 0;
+    const total = tiempo * precio;
+    const preview = $("#alquiler-preview-importe");
+    if (preview) {
+        preview.value = total.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+}
+
+function toggleMetodoPagoAlquiler() {
+    const estado = $("#alquiler-estado-pago")?.value;
+    const metodoSelect = $("#alquiler-metodo-pago");
+    if (!metodoSelect) return;
+
+    if (estado === "Pendiente") {
+        metodoSelect.disabled = true;
+        metodoSelect.value = "";
+    } else {
+        metodoSelect.disabled = false;
+        if (!metodoSelect.value) metodoSelect.value = "Efectivo";
+    }
+}
+
+function initAlquilerAutocompleteMaquinaria() {
+    const input = $("#alquiler-maquinaria-search");
+    const dropdown = $("#alquiler-maquinaria-dropdown");
+    const hiddenId = $("#alquiler-maquinaria-id");
+    const status = $("#alquiler-maquinaria-status");
+    if (!input || !dropdown) return;
+
+    input.addEventListener("input", async (e) => {
+        const query = e.target.value.trim().toUpperCase();
+        hiddenId.value = "";
+        status.textContent = "";
+
+        if (query.length < 2) {
+            dropdown.innerHTML = "";
+            dropdown.classList.remove("open");
+            return;
+        }
+
+        try {
+            const res = await api.get(`/maquinarias?q=${encodeURIComponent(query)}&activo=1`);
+            const items = res.data || [];
+
+            if (!items.length) {
+                dropdown.innerHTML = '<div style="padding: 10px; color: var(--muted); font-size: 0.85rem;">No hay maquinarias activas encontradas</div>';
+                dropdown.classList.add("open");
+                return;
+            }
+
+            dropdown.innerHTML = items.map(m => `
+                <button type="button" data-id="${m.id}" data-placa="${escapeHtml(m.placa)}" data-desc="${escapeHtml(m.descripcion)}" style="display: flex; justify-content: space-between; align-items: center; width: 100%; text-align: left;">
+                    <strong style="color: var(--accent);">${escapeHtml(m.placa)}</strong>
+                    <small style="color: var(--muted);">${escapeHtml(m.descripcion)}</small>
+                </button>
+            `).join("");
+            dropdown.classList.add("open");
+
+            dropdown.querySelectorAll("button").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    hiddenId.value = btn.dataset.id;
+                    input.value = btn.dataset.placa;
+                    status.textContent = `Seleccionada: ${btn.dataset.placa} (${btn.dataset.desc})`;
+                    dropdown.classList.remove("open");
+                });
+            });
+        } catch (err) {
+            dropdown.classList.remove("open");
+        }
+    });
+}
+
+function initAlquilerAutocompleteCliente() {
+    const input = $("#alquiler-cliente-search");
+    const dropdown = $("#alquiler-cliente-dropdown");
+    const hiddenId = $("#alquiler-cliente-id");
+    const status = $("#alquiler-cliente-status");
+    if (!input || !dropdown) return;
+
+    input.addEventListener("input", async (e) => {
+        const query = e.target.value.trim();
+        hiddenId.value = "";
+        status.textContent = "";
+
+        if (query.length < 2) {
+            dropdown.innerHTML = "";
+            dropdown.classList.remove("open");
+            return;
+        }
+
+        try {
+            const res = await api.get(`/clientes?search=${encodeURIComponent(query)}`);
+            const clientes = (res.data || []).slice(0, 5);
+
+            if (!clientes.length) {
+                dropdown.innerHTML = '<div style="padding: 10px; color: var(--muted); font-size: 0.85rem;">Cliente no encontrado</div>';
+                dropdown.classList.add("open");
+                return;
+            }
+
+            dropdown.innerHTML = clientes.map(c => `
+                <button type="button" data-id="${c.id}" data-nombre="${escapeHtml(c.nombre)}" data-doc="${escapeHtml(c.dni || '')}" style="display: flex; justify-content: space-between; align-items: center; width: 100%; text-align: left;">
+                    <span>${escapeHtml(c.nombre)}</span>
+                    <small style="color: var(--muted);">${c.dni ? (c.tipo_documento ? c.tipo_documento.toUpperCase() + ': ' : '') + escapeHtml(c.dni) : 'Sin documento'}</small>
+                </button>
+            `).join("");
+            dropdown.classList.add("open");
+
+            dropdown.querySelectorAll("button").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    hiddenId.value = btn.dataset.id;
+                    input.value = btn.dataset.nombre;
+                    status.textContent = `Cliente: ${btn.dataset.nombre} ${btn.dataset.doc ? `(${btn.dataset.doc})` : ''}`;
+                    dropdown.classList.remove("open");
+                });
+            });
+        } catch (err) {
+            dropdown.classList.remove("open");
+        }
+    });
+}
+
+async function saveAlquiler(event) {
+    event.preventDefault();
+
+    const clienteId = $("#alquiler-cliente-id").value;
+    const maquinariaId = $("#alquiler-maquinaria-id").value;
+
+    if (!clienteId) {
+        showToast("Selecciona un cliente válido de la lista.", "error");
+        return;
+    }
+    if (!maquinariaId) {
+        showToast("Selecciona una maquinaria válida de la lista.", "error");
+        return;
+    }
+
+    // Calcular el importe antes de enviar al backend
+    const tiempo = parseFloat($("#alquiler-tiempo").value) || 0;
+    const precio = parseFloat($("#alquiler-precio").value) || 0;
+    const importeCalculado = tiempo * precio;
+
+    // Payload con los nombres EXACTOS de la base de datos
+
+    const cuentaEstado = $("#alquiler-estado-pago").value;
+    const destinoPago = cuentaEstado === "Pendiente" 
+        ? "Por definir" 
+        : ($("#alquiler-metodo-pago")?.value || "Por definir");
+
+    const payload = {
+        dia: $("#alquiler-fecha").value,
+        cliente_id: parseInt(clienteId, 10),
+        proyecto: $("#alquiler-proyecto-search")?.value.trim() || "",
+        maquinaria_id: parseInt(maquinariaId, 10),
+        horas: tiempo,
+        precio: precio,
+        importe_proyecto: importeCalculado,
+        cuenta: cuentaEstado,
+        destino_pago: destinoPago,
+        comprobante: $("#alquiler-comprobante")?.value || "S. CP",
+        observacion: $("#alquiler-obs")?.value.trim() || null,
+    };
+
+    try {
+        await api.post("/alquileres", payload);
+        showToast("Alquiler registrado correctamente.");
+        closeAlquilerModal();
+        loadAlquileres();
+    } catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+function showAlquilerDetails(id) {
+    const a = state.alquileres.find((item) => item.id === id);
+    if (!a) return;
+
+    $("#alquiler-details-title").textContent = `Detalle de Alquiler #${a.id}`;
+
+    // Mapeo exacto a las columnas de tu Base de Datos
+    const estado = a.cuenta || "-";
+    const badgeClass = estado === "Cobrado" ? "pagado" : "contra";
+    const fecha = a.dia || a.fecha;
+    const total = a.importe_proyecto || 0;
+    const metodoPago = a.destino_pago || 'No especificado / Pendiente';
+    const horas = a.horas || 0;
+    const tarifa = a.precio || 0;
+    const proyecto = a.proyecto || 'No asignado';
+    const notas = a.observacion || 'Sin notas registradas.';
+
+    $("#alquiler-details-body").innerHTML = `
+        <div style="background: var(--panel-soft); border-radius: 8px; padding: 14px; margin-bottom: 1.25rem; border: 1px solid var(--line);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="color: var(--muted); font-size: 0.85rem;">Comprobante: <strong>${escapeHtml(a.comprobante || 'Sin comprobante')}</strong></span>
+                <span class="badge ${badgeClass}">${escapeHtml(estado)}</span>
+            </div>
+            <div style="font-size: 1.6rem; font-weight: 800; color: var(--accent); font-family: 'Outfit', sans-serif;">
+                ${money(total)}
+            </div>
+            <small style="color: var(--muted);">Método de pago: ${escapeHtml(metodoPago)}</small>
+        </div>
+
+        <div class="detail-grid">
+            <div><span>Fecha de inicio</span><strong>${formatDate(fecha)}</strong></div>
+            <div><span>Cliente</span><strong>${escapeHtml(a.cliente?.nombre || a.cliente_nombre || '-')}</strong></div>
+            <div><span>Maquinaria</span><strong>${escapeHtml(a.maquinaria?.placa || a.maquinaria_placa || '-')}</strong></div>
+            <div><span>Proyecto / Obra</span><strong>${escapeHtml(proyecto)}</strong></div>
+            <div><span>Tiempo trabajado</span><strong>${horas} (hrs / días)</strong></div>
+            <div><span>Tarifa unitaria</span><strong>${money(tarifa)}</strong></div>
+            <div class="span-all">
+                <span>Observaciones</span>
+                <p>${escapeHtml(notas)}</p>
+            </div>
+        </div>
+    `;
+
+    $("#alquiler-details-modal").classList.add("open");
+    $("#alquiler-details-modal").setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+}
+
+function closeAlquilerDetailsModal() {
+    $("#alquiler-details-modal").classList.remove("open");
+    $("#alquiler-details-modal").setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+}
+
 function filterParams() {
     const params = new URLSearchParams();
     Object.entries(state.filters).forEach(([key, value]) => {
@@ -2787,11 +3242,6 @@ function formatDate(value) {
 function money(value) {
     if (value === null || value === undefined || value === "") return "-";
     return `S/ ${Number(value).toFixed(2)}`;
-}
-
-function truncate(value, size) {
-    if (!value || value.length <= size) return value || "";
-    return `${value.slice(0, size)}...`;
 }
 
 function escapeHtml(value) {
@@ -2861,7 +3311,6 @@ async function loadDashboardGanancias() {
         const kpi = data.kpis;
         const sol = (n) => "S/ " + Number(n).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-        // Actualizar KPIs
         const elIngresos = document.getElementById("kpi-ingresos");
         const elVolumen = document.getElementById("kpi-volumen");
         const elCostos = document.getElementById("kpi-costos");
@@ -2874,7 +3323,6 @@ async function loadDashboardGanancias() {
         if (elUtilidad) elUtilidad.textContent = sol(kpi.utilidad);
         if (elMargen) elMargen.textContent = `${kpi.margen_pct}%`;
 
-        // Renderizar Top 5 Clientes Deudores
         const topCliBody = document.getElementById("dash-top-clientes-body");
         if (topCliBody) {
             if (!data.top_deudores || data.top_deudores.length === 0) {
@@ -2905,7 +3353,6 @@ async function loadDashboardGanancias() {
             }
         }
 
-        // Renderizar Top 5 Transportistas por Liquidar
         const topTransBody = document.getElementById("dash-top-transportistas-body");
         if (topTransBody) {
             if (!data.top_transportistas || data.top_transportistas.length === 0) {
@@ -2936,7 +3383,6 @@ async function loadDashboardGanancias() {
             }
         }
 
-        // Gráfico Chart.js
         const ctx = document.getElementById("dash-chart-canvas");
         if (ctx && data.chart) {
             if (dashboardChartInstance) {
@@ -3023,7 +3469,6 @@ async function loadDashboardGanancias() {
     }
 }
 
-
 let auditCurrentTab = 'transportistas';
 let auditTransPage = 1;
 let auditCobroPage = 1;
@@ -3089,7 +3534,6 @@ function setupAuditTabs() {
     }
 }
 
-// --- PESTAÑA 1: PAGOS A TRANSPORTISTAS ---
 async function cargarAuditoriaTransportistas(page = 1) {
     auditTransPage = page;
     const inicio = document.getElementById('audit-trans-filter-inicio')?.value || '';
@@ -3146,7 +3590,6 @@ async function cargarAuditoriaTransportistas(page = 1) {
     }
 }
 
-
 function exportarAuditoriaTransportistas() {
     const inicio = document.getElementById('audit-trans-filter-inicio')?.value || '';
     const fin = document.getElementById('audit-trans-filter-fin')?.value || '';
@@ -3160,17 +3603,18 @@ function exportarAuditoriaTransportistas() {
     window.location.href = `/api/auditoria/transportistas/export?${params.toString()}`;
 }
 
-// --- PESTAÑA 2: COBRANZAS A CLIENTES ---
 async function cargarAuditoriaCobros(page = 1) {
     auditCobroPage = page;
     const inicio = document.getElementById('audit-cobro-filter-inicio')?.value || '';
     const fin = document.getElementById('audit-cobro-filter-fin')?.value || '';
     const buscar = document.getElementById('audit-cobro-filter-buscar')?.value || '';
+    const servicio = document.getElementById('audit-cobro-filter-servicio')?.value || '';
 
     const params = new URLSearchParams({ page });
     if (inicio) params.append('fecha_inicio', inicio);
     if (fin) params.append('fecha_fin', fin);
     if (buscar) params.append('buscar', buscar);
+    if (servicio) params.append('servicio', servicio);
 
     const tbody = document.getElementById('audit-cobro-table-body');
     if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 2rem; color: var(--muted);">Cargando registros...</td></tr>';
@@ -3221,16 +3665,17 @@ function exportarAuditoriaCobros() {
     const inicio = document.getElementById('audit-cobro-filter-inicio')?.value || '';
     const fin = document.getElementById('audit-cobro-filter-fin')?.value || '';
     const buscar = document.getElementById('audit-cobro-filter-buscar')?.value || '';
+    const servicio = document.getElementById('audit-cobro-filter-servicio')?.value || ''; // <-- Capturar aquí también
 
     const params = new URLSearchParams();
     if (inicio) params.append('fecha_inicio', inicio);
     if (fin) params.append('fecha_fin', fin);
     if (buscar) params.append('buscar', buscar);
+    if (servicio) params.append('servicio', servicio); // <-- Adjuntar aquí también
 
     window.location.href = `/api/auditoria/cobros/export?${params.toString()}`;
 }
 
-// --- GRÁFICO MIXTO: MOVIMIENTO DIARIO + LÍNEA DE FLUJO ACUMULADO ---
 function renderMixedTimelineChart(canvasId, records, dateField, amountField, barColor, labelName, currentChartInstance, setChartInstance) {
     const canvas = document.getElementById(canvasId);
     if (!canvas || typeof Chart === 'undefined') return;
@@ -3317,9 +3762,7 @@ function renderMixedTimelineChart(canvasId, records, dateField, amountField, bar
             },
             scales: {
                 x: {
-                    grid: {
-                        display: false
-                    },
+                    grid: { display: false },
                     ticks: {
                         color: '#94a3b8',
                         font: { size: 11, weight: '500' },
@@ -3346,7 +3789,6 @@ function renderMixedTimelineChart(canvasId, records, dateField, amountField, bar
     setChartInstance(newChart);
 }
 
-// --- PAGINADOR REUTILIZABLE CON ESTILO DARK THEME ---
 function renderAuditPagination(containerId, meta, onPageChange) {
     const container = document.getElementById(containerId);
     if (!container || !meta) return;
@@ -3445,8 +3887,6 @@ function setupLiveAutocomplete(inputId, dropdownId, urlEndpoint, docField, onSel
 
 function initAuditoriaFinanciera() {
     setupAuditTabs();
-    
-    // Autocomplete para Transportistas
     setupLiveAutocomplete(
         'audit-trans-filter-buscar', 
         'audit-trans-autocomplete-list', 
@@ -3454,8 +3894,6 @@ function initAuditoriaFinanciera() {
         'documento', 
         () => cargarAuditoriaTransportistas(1)
     );
-
-    // Autocomplete para Clientes
     setupLiveAutocomplete(
         'audit-cobro-filter-buscar', 
         'audit-cobro-autocomplete-list', 
@@ -3463,6 +3901,85 @@ function initAuditoriaFinanciera() {
         'dni', 
         () => cargarAuditoriaCobros(1)
     );
-
     cargarAuditoriaTransportistas(1);
+}
+
+function actualizarCardSaldosAbono() {
+    const selectOrigen = $("#abono-origen");
+    if (!selectOrigen) return;
+    
+    const origen = selectOrigen.value;
+    const isEnvios = origen === 'envios';
+    const saldoActivo = isEnvios ? currentAbonoClientData.deudaEnvios : currentAbonoClientData.deudaAlquileres;
+    
+    const elSaldoActivo = $("#abono-saldo-activo");
+    const elBadge = $("#abono-badge-cuenta");
+    if (elSaldoActivo) elSaldoActivo.textContent = money(saldoActivo);
+    
+    if (elBadge) {
+        elBadge.textContent = isEnvios ? 'Línea Envíos' : 'Línea Alquileres';
+        elBadge.className = `badge ${isEnvios ? 'badge-primary' : 'badge-warning'}`;
+        elBadge.style.background = isEnvios ? 'rgba(56, 189, 248, 0.15)' : 'rgba(245, 158, 11, 0.15)';
+        elBadge.style.color = isEnvios ? '#38bdf8' : '#f59e0b';
+    }
+
+    const boxEnvios = $("#box-sub-envios");
+    const boxAlquileres = $("#box-sub-alquileres");
+    if (boxEnvios && boxAlquileres) {
+        if (isEnvios) {
+            boxEnvios.style.background = 'rgba(56, 189, 248, 0.12)';
+            boxEnvios.style.border = '1px solid #38bdf8';
+            boxAlquileres.style.background = 'var(--panel)';
+            boxAlquileres.style.border = '1px solid var(--line)';
+        } else {
+            boxAlquileres.style.background = 'rgba(245, 158, 11, 0.12)';
+            boxAlquileres.style.border = '1px solid #f59e0b';
+            boxEnvios.style.background = 'var(--panel)';
+            boxEnvios.style.border = '1px solid var(--line)';
+        }
+    }
+}
+
+function setupAbonoModalEvents() {
+    $("#abono-origen")?.addEventListener("change", () => {
+        actualizarCardSaldosAbono();
+        $("#abono-monto").value = ''; 
+    });
+
+    $("#box-sub-envios")?.addEventListener("click", () => {
+        if ($("#abono-origen")) { $("#abono-origen").value = 'envios'; actualizarCardSaldosAbono(); $("#abono-monto").value = ''; }
+    });
+
+    $("#box-sub-alquileres")?.addEventListener("click", () => {
+        if ($("#abono-origen")) { $("#abono-origen").value = 'alquileres'; actualizarCardSaldosAbono(); $("#abono-monto").value = ''; }
+    });
+
+    $("#btn-abono-saldar-todo")?.addEventListener("click", () => {
+        const origen = $("#abono-origen")?.value || 'envios';
+        const saldoActivo = origen === 'envios' ? currentAbonoClientData.deudaEnvios : currentAbonoClientData.deudaAlquileres;
+        if (saldoActivo > 0) {
+            $("#abono-monto").value = parseFloat(saldoActivo).toFixed(2);
+        }
+    });
+}
+
+function setupMovementsTabs() {
+    const btnTodos = $("#tab-mov-todos");
+    const btnEnvios = $("#tab-mov-envios");
+    const btnAlquileres = $("#tab-mov-alquileres");
+
+    if (!btnTodos || !btnEnvios || !btnAlquileres) return;
+
+    const setTabStyle = (activeBtn) => {
+        [btnTodos, btnEnvios, btnAlquileres].forEach(btn => {
+            const isActive = btn === activeBtn;
+            btn.style.background = isActive ? 'var(--accent)' : 'var(--panel-soft)';
+            btn.style.color = isActive ? '#000' : 'var(--text)';
+            btn.style.fontWeight = isActive ? '700' : '400';
+        });
+    };
+
+    btnTodos.onclick = () => { currentMovementTab = 'todos'; setTabStyle(btnTodos); renderDebtMovementsInModal(); };
+    btnEnvios.onclick = () => { currentMovementTab = 'envios'; setTabStyle(btnEnvios); renderDebtMovementsInModal(); };
+    btnAlquileres.onclick = () => { currentMovementTab = 'alquileres'; setTabStyle(btnAlquileres); renderDebtMovementsInModal(); };
 }

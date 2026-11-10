@@ -512,7 +512,6 @@ class EnvioController extends Controller
                 'string',
                 'max:40',
                 'regex:/^[A-Za-z0-9-]+$/',
-                Rule::unique('envios', 'guia')->ignore($envio?->id),
             ],
             'observacion' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
@@ -524,7 +523,6 @@ class EnvioController extends Controller
         $validated = $request->validate($rules, [
             'guia.required' => 'La guia de remitente es obligatoria.',
             'guia.regex' => 'La guia de remitente solo acepta letras, numeros y guiones.',
-            'guia.unique' => 'La guia ingresada ya existe.',
             'items.required' => 'Debe agregar al menos un item.',
             'items.min' => 'Debe agregar al menos un item.',
             'items.*.cantidad.required' => 'La cantidad es obligatoria.',

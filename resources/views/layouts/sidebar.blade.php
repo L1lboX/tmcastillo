@@ -37,6 +37,19 @@
             @endcan
         </div>
 
+        <div class="sidebar-group" data-group="alquileres">
+            <button class="sidebar-group-label" type="button" data-toggle-group="alquileres">
+                <span>Maquinaria</span>
+                <span class="material-icon sidebar-group-arrow">expand_more</span>
+            </button>
+            @can('alquileres.view')
+                <a class="sidebar-link {{ request()->query('section') === 'alquileres' ? 'active' : '' }}" href="{{ route('sistema', ['section' => 'alquileres']) }}">Alquileres</a>
+            @endcan
+            @can('maquinarias.manage')
+                <a class="sidebar-link {{ request()->query('section') === 'maquinarias' ? 'active' : '' }}" href="{{ route('sistema', ['section' => 'maquinarias']) }}">Maquinarias</a>
+            @endcan
+        </div>
+
         @can('envios.amounts')
             <div class="sidebar-group" data-group="finanzas">
                 <button class="sidebar-group-label" type="button" data-toggle-group="finanzas">

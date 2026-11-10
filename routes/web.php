@@ -1,19 +1,22 @@
 <?php
 
+use App\Http\Controllers\Api\AlquilerController;
+use App\Http\Controllers\Api\AuditoriaCobroController;
+use App\Http\Controllers\Api\AuditoriaPagoController;
 use App\Http\Controllers\Api\ClienteController;
 use App\Http\Controllers\Api\CuentaCorrienteController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\EnvioController;
+use App\Http\Controllers\Api\MaquinariaController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\TransportistaController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\ContactController;
-use App\Http\Controllers\Api\DashboardController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\AuditoriaPagoController;
-use App\Http\Controllers\Api\AuditoriaCobroController;
 
+// Rutas Públicas
 Route::get('/', function () {
     return view('public.index');
 })->name('home');
@@ -22,6 +25,7 @@ Route::post('/contacto', ContactController::class)
     ->middleware('throttle:6,1')
     ->name('contacto.store');
 
+// Autenticación
 Route::get('/login', function () {
     if (Auth::check()) {
         return redirect()->route('sistema');
@@ -32,7 +36,7 @@ Route::get('/login', function () {
 
 Route::post('/login', function (Request $request) {
     $credentials = $request->validate([
-        'usuario' => ['required', 'string', 'max:120'],
+        'usuario'  => ['required', 'string', 'max:120'],
         'password' => ['required', 'string', 'max:120'],
     ]);
 
@@ -42,7 +46,7 @@ Route::post('/login', function (Request $request) {
     if (Auth::attempt([$field => $login, 'password' => $credentials['password'], 'active' => true])) {
         $request->session()->regenerate();
 
-        return redirect()->intended('/sistema');
+        return redirect('/sistema');
     }
 
     return back()
@@ -58,17 +62,31 @@ Route::post('/logout', function (Request $request) {
     return redirect()->route('login');
 })->middleware('auth')->name('logout');
 
-Route::get('/sistema', function () {
-    return view('envios.index');
-})->middleware('auth')->name('sistema');
+// Vistas Web Blade protegidas (SPA Centralizada)
+Route::middleware('auth')->group(function (): void {
+    Route::get('/sistema', function () {
+        return view('envios.index');
+    })->name('sistema');
 
-Route::get('/asignacion-carga', function () {
-    return view('asignacion.index');
-})->middleware('auth')->name('asignacion');
+    Route::get('/asignacion-carga', function () {
+        return view('asignacion.index');
+    })->name('asignacion');
 
+    // Redirecciones hacia la SPA para mantener soporte con enlaces directos
+    Route::get('/maquinarias', function () {
+        return redirect()->route('sistema', ['section' => 'maquinarias']);
+    })->name('maquinarias');
+
+    Route::get('/alquileres', function () {
+        return redirect()->route('sistema', ['section' => 'alquileres']);
+    })->name('alquileres');
+});
+
+// Rutas de API protegidas
 Route::middleware('auth')->prefix('api')->group(function (): void {
     Route::get('/me', [UserController::class, 'me']);
 
+    // Envíos y Estadísticas
     Route::middleware('permission:envios.view')->group(function (): void {
         Route::get('/envios', [EnvioController::class, 'index']);
         Route::get('/stats', [EnvioController::class, 'stats']);
@@ -97,6 +115,7 @@ Route::middleware('auth')->prefix('api')->group(function (): void {
     Route::delete('/envios/{envio}', [EnvioController::class, 'destroy'])
         ->middleware('permission:envios.delete');
 
+    // Clientes
     Route::get('/clientes', [ClienteController::class, 'index'])
         ->middleware('permission:envios.create');
     Route::get('/clientes/{cliente}', [ClienteController::class, 'show'])
@@ -110,6 +129,7 @@ Route::middleware('auth')->prefix('api')->group(function (): void {
     Route::patch('/clientes/{cliente}/toggle', [ClienteController::class, 'toggleActive'])
         ->middleware('permission:clientes.manage');
 
+    // Transportistas
     Route::get('/transportistas', [TransportistaController::class, 'index'])
         ->middleware('permission:envios.create');
     Route::get('/transportistas/metrics', [TransportistaController::class, 'metrics'])
@@ -127,23 +147,46 @@ Route::middleware('auth')->prefix('api')->group(function (): void {
     Route::patch('/transportistas/{transportista}/toggle', [TransportistaController::class, 'toggleActive'])
         ->middleware('permission:transportistas.manage');
 
+    // Maquinarias
+    Route::get('/maquinarias', [MaquinariaController::class, 'index'])
+        ->middleware('permission:envios.create');
+    Route::get('/maquinarias/{maquinaria}', [MaquinariaController::class, 'show'])
+        ->middleware('permission:envios.create');
+    Route::post('/maquinarias', [MaquinariaController::class, 'store'])
+        ->middleware('permission:clientes.manage');
+    Route::put('/maquinarias/{maquinaria}', [MaquinariaController::class, 'update'])
+        ->middleware('permission:clientes.manage');
+    Route::patch('/maquinarias/{maquinaria}/toggle', [MaquinariaController::class, 'cambiarEstado'])
+        ->middleware('permission:clientes.manage');
+    Route::patch('/maquinarias/{maquinaria}/estado', [MaquinariaController::class, 'cambiarEstado'])
+        ->middleware('permission:clientes.manage');
+
+    // Alquileres
+    Route::get('/alquileres/proyectos', [AlquilerController::class, 'proyectos'])
+        ->middleware('permission:envios.view');
+    Route::get('/alquileres', [AlquilerController::class, 'index'])
+        ->middleware('permission:envios.view');
+    Route::get('/alquileres/{alquiler}', [AlquilerController::class, 'show'])
+        ->middleware('permission:envios.view');
+    Route::post('/alquileres', [AlquilerController::class, 'store'])
+        ->middleware('permission:envios.create');
+    Route::put('/alquileres/{alquiler}', [AlquilerController::class, 'update'])
+        ->middleware('permission:envios.update');
+
+    // Auditorías
     Route::get('/auditoria/transportistas', [AuditoriaPagoController::class, 'index']);
     Route::get('/auditoria/cobros', [AuditoriaCobroController::class, 'index']);
     Route::get('/transportistas/{transportista}/historial-pagos', [AuditoriaPagoController::class, 'porTransportista']);
     Route::get('/auditoria/transportistas/buscar-rapido', [AuditoriaPagoController::class, 'autocompletarChoferes']);
     Route::get('/auditoria/clientes/buscar-rapido', [AuditoriaCobroController::class, 'autocompletarClientes']);
+    Route::get('/auditoria/transportistas/export', [AuditoriaPagoController::class, 'export']);  
+    Route::get('/auditoria/cobros/export', [AuditoriaCobroController::class, 'export']);
 
-    Route::get('auditoria/transportistas/export', [AuditoriaPagoController::class, 'export']);  
-    Route::get('auditoria/cobros/export', [AuditoriaCobroController::class, 'export']);
-
+    // Dashboard
     Route::get('/dashboard/ganancias', [DashboardController::class, 'ganancias'])
         ->middleware('permission:envios.amounts');
 
-    Route::get('/auditoria/transportistas', [AuditoriaPagoController::class, 'index']);
-    Route::get('/transportistas/{transportista}/historial-pagos', [AuditoriaPagoController::class, 'porTransportista']);
-
-    
-
+    // Usuarios
     Route::middleware('permission:users.manage')->group(function (): void {
         Route::get('/users', [UserController::class, 'index']);
         Route::post('/users', [UserController::class, 'store']);
@@ -151,6 +194,7 @@ Route::middleware('auth')->prefix('api')->group(function (): void {
         Route::delete('/users/{user}', [UserController::class, 'destroy']);
     });
 
+    // Roles
     Route::middleware('permission:roles.manage')->group(function (): void {
         Route::get('/roles', [RoleController::class, 'index']);
         Route::post('/roles', [RoleController::class, 'store']);
@@ -158,11 +202,13 @@ Route::middleware('auth')->prefix('api')->group(function (): void {
         Route::delete('/roles/{role}', [RoleController::class, 'destroy']);
     });
 
+    // Cuentas Corrientes
     Route::middleware('permission:clientes.debt')->group(function (): void {
         Route::get('/cuentas-corrientes', [CuentaCorrienteController::class, 'index']);
         Route::get('/cuentas-corrientes/clientes-con-deuda', [CuentaCorrienteController::class, 'clientesConDeuda']);
         Route::get('/cuentas-corrientes/saldo/{cliente}', [CuentaCorrienteController::class, 'saldoCliente']);
         Route::post('/cuentas-corrientes/abono', [CuentaCorrienteController::class, 'registrarAbono']);
         Route::post('/cuentas-corrientes/sync-envio/{envio}', [CuentaCorrienteController::class, 'syncEnvioCredito']);
+        Route::post('/cuentas-corrientes/sync-alquiler/{alquiler}', [CuentaCorrienteController::class, 'syncAlquilerCredito']);
     });
 });

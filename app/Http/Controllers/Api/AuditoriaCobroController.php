@@ -6,6 +6,8 @@ use App\Traits\GeneratesExcel;
 use Illuminate\Http\Response;
 use App\Http\Controllers\Controller;
 use App\Models\CuentaCorriente;
+use App\Models\Cliente;
+use App\Models\Alquiler;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,42 +22,98 @@ class AuditoriaCobroController extends Controller
         $fechaFin    = $request->query('fecha_fin');
         $clienteId   = $request->query('cliente_id');
         $buscar      = trim((string) $request->query('buscar', ''));
+        $servicio    = trim((string) $request->query('servicio', '')); // Recibe 'envios' o 'alquileres'
 
-        $query = CuentaCorriente::query()->where('tipo', 'abono');
+        $consolidado = collect();
 
-        if ($clienteId) {
-            $query->where('cliente_id', (int) $clienteId);
-        }
+        // 1. Obtener Envíos (si no se filtró exclusivamente por alquileres)
+        if ($servicio === '' || $servicio === 'envios') {
+            $enviosQuery = CuentaCorriente::with(['cliente', 'envio'])
+                ->where('tipo', 'abono')
+                ->whereNotNull('envio_id'); // Filtro estricto para los pagos de envíos
 
-        if ($buscar !== '') {
-            $query->whereHas('cliente', function ($q) use ($buscar) {
-                $q->where('nombre', 'like', "%{$buscar}%")
-                  ->orWhere('dni', 'like', "%{$buscar}%");
+            if ($clienteId) {
+                $enviosQuery->where('cliente_id', (int) $clienteId);
+            }
+
+            if ($buscar !== '') {
+                $enviosQuery->whereHas('cliente', function ($q) use ($buscar) {
+                    $q->where('nombre', 'like', "%{$buscar}%")->orWhere('dni', 'like', "%{$buscar}%");
+                });
+            }
+
+            if ($fechaInicio && $fechaFin) {
+                $fInicio = Carbon::parse($fechaInicio)->toDateString();
+                $fFin    = Carbon::parse($fechaFin)->toDateString();
+                $enviosQuery->whereBetween('fecha', [$fInicio, $fFin]);
+            }
+
+            $envios = $enviosQuery->get()->map(function ($item) {
+                return [
+                    'id'              => $item->id,
+                    'fecha'           => $item->fecha,
+                    'monto'           => (float) $item->monto,
+                    'saldo_acumulado' => (float) $item->saldo_acumulado,
+                    'observacion'     => $item->observacion ?: 'Pago de envío',
+                    'cliente'         => $item->cliente ? ['id' => $item->cliente->id, 'nombre' => $item->cliente->nombre, 'dni' => $item->cliente->dni] : null,
+                    'tipo_origen'     => 'envios',
+                    'metodo_pago'     => $item->metodo_pago,
+                    'timestamp'       => Carbon::parse($item->fecha)->timestamp,
+                ];
             });
+
+            $consolidado = $consolidado->concat($envios);
         }
 
-        if ($fechaInicio && $fechaFin) {
-            $query->whereBetween('fecha', [
-                Carbon::parse($fechaInicio)->toDateString(),
-                Carbon::parse($fechaFin)->toDateString(),
-            ]);
+        // 2. Obtener Alquileres Cobrados (si no se filtró exclusivamente por envíos)
+        if ($servicio === '' || $servicio === 'alquileres') {
+            $alquileresQuery = Alquiler::with(['cliente'])->where('cuenta', 'Cobrado');
+
+            if ($clienteId) {
+                $alquileresQuery->where('cliente_id', (int) $clienteId);
+            }
+
+            if ($buscar !== '') {
+                $alquileresQuery->whereHas('cliente', function ($q) use ($buscar) {
+                    $q->where('nombre', 'like', "%{$buscar}%")->orWhere('dni', 'like', "%{$buscar}%");
+                });
+            }
+
+            if ($fechaInicio && $fechaFin) {
+                $fInicio = Carbon::parse($fechaInicio)->toDateString();
+                $fFin    = Carbon::parse($fechaFin)->toDateString();
+                $alquileresQuery->whereBetween('dia', [$fInicio, $fFin]);
+            }
+
+            $alquileres = $alquileresQuery->get()->map(function ($item) {
+                return [
+                    'id'              => $item->id,
+                    'fecha'           => $item->dia,
+                    'monto'           => (float) $item->importe_proyecto,
+                    'saldo_acumulado' => 0.00,
+                    'observacion'     => $item->observacion ?: 'Alquiler pagado al contado',
+                    'cliente'         => $item->cliente ? ['id' => $item->cliente->id, 'nombre' => $item->cliente->nombre, 'dni' => $item->cliente->dni] : null,
+                    'tipo_origen'     => 'alquileres',
+                    'metodo_pago'     => $item->destino_pago,
+                    'timestamp'       => Carbon::parse($item->dia)->timestamp,
+                ];
+            });
+
+            $consolidado = $consolidado->concat($alquileres);
         }
 
-        // 1. KPIs calculados sobre los mismos filtros
-        $kpiQuery = (clone $query);
+        // Fusionar y Ordenar Descendente
+        $consolidado = $consolidado->sortByDesc('timestamp')->values();
 
-        $totalRecaudado   = (float) $kpiQuery->sum('monto');
-        $abonosRealizados = (int) $kpiQuery->count();
-        $clientesAbonaron = (int) $kpiQuery->distinct('cliente_id')->count('cliente_id');
+        // Calcular KPIs Globales
+        $totalRecaudado   = $consolidado->sum('monto');
+        $abonosRealizados = $consolidado->count();
+        $clientesAbonaron = $consolidado->pluck('cliente.id')->filter()->unique()->count();
 
-        // 2. Relaciones y paginación para la tabla
-        $abonos = $query->with([
-            'cliente:id,dni,nombre,telefono',
-            'envio:id,codigo,guia',
-        ])
-        ->latest('fecha')
-        ->latest('id')
-        ->paginate(15);
+        // Paginación Manual
+        $perPage = 15;
+        $page = (int) $request->query('page', 1);
+        $paginatedItems = $consolidado->slice(($page - 1) * $perPage, $perPage)->values();
 
         return response()->json([
             'ok'   => true,
@@ -64,7 +122,13 @@ class AuditoriaCobroController extends Controller
                 'abonos_realizados' => $abonosRealizados,
                 'clientes_abonaron' => $clientesAbonaron,
             ],
-            'data' => $abonos,
+            'data' => [
+                'current_page' => $page,
+                'data'         => $paginatedItems,
+                'last_page'    => max(1, (int) ceil($consolidado->count() / $perPage)),
+                'per_page'     => $perPage,
+                'total'        => $consolidado->count(),
+            ]
         ]);
     }
 
@@ -75,7 +139,7 @@ class AuditoriaCobroController extends Controller
             return response()->json(['ok' => true, 'data' => []]);
         }
 
-        $clientes = \App\Models\Cliente::query()
+        $clientes = Cliente::query()
             ->where('nombre', 'like', "%{$q}%")
             ->orWhere('dni', 'like', "%{$q}%")
             ->select('id', 'nombre', 'dni')
@@ -91,68 +155,114 @@ class AuditoriaCobroController extends Controller
         $fechaFin    = $request->query('fecha_fin');
         $clienteId   = $request->query('cliente_id');
         $buscar      = trim((string) $request->query('buscar', ''));
+        $servicio    = trim((string) $request->query('servicio', ''));
 
-        $query = CuentaCorriente::with([
-            'cliente:id,dni,nombre,telefono',
-            'envio:id,codigo,guia',
-        ])
-        ->where('tipo', 'abono')
-        ->latest('fecha')
-        ->latest('id');
+        $consolidado = collect();
 
-        if ($clienteId) {
-            $query->where('cliente_id', (int) $clienteId);
-        }
+        if ($servicio === '' || $servicio === 'envios') {
+            $enviosQuery = CuentaCorriente::with(['cliente', 'envio'])
+                ->where('tipo', 'abono')
+                ->whereNotNull('envio_id');
 
-        if ($buscar !== '') {
-            $query->whereHas('cliente', function ($q) use ($buscar) {
-                $q->where('nombre', 'like', "%{$buscar}%")
-                  ->orWhere('dni', 'like', "%{$buscar}%");
+            if ($clienteId) {
+                $enviosQuery->where('cliente_id', (int) $clienteId);
+            }
+            if ($buscar !== '') {
+                $enviosQuery->whereHas('cliente', function ($q) use ($buscar) {
+                    $q->where('nombre', 'like', "%{$buscar}%")->orWhere('dni', 'like', "%{$buscar}%");
+                });
+            }
+            if ($fechaInicio && $fechaFin) {
+                $fInicio = Carbon::parse($fechaInicio)->toDateString();
+                $fFin    = Carbon::parse($fechaFin)->toDateString();
+                $enviosQuery->whereBetween('fecha', [$fInicio, $fFin]);
+            }
+
+            $envios = $enviosQuery->get()->map(function ($item) {
+                return [
+                    'id'          => $item->id,
+                    'fecha'       => $item->fecha,
+                    'cliente'     => $item->cliente ? $item->cliente->nombre : 'Sin cliente',
+                    'dni'         => $item->cliente ? $item->cliente->dni : '-',
+                    'telefono'    => $item->cliente ? $item->cliente->telefono : '-',
+                    'referencia'  => $item->envio ? ($item->envio->guia ?? $item->envio->codigo) : '-',
+                    'tipo_origen' => 'Envío',
+                    'metodo_pago' => $item->metodo_pago ?? 'Efectivo',
+                    'monto'       => (float) $item->monto,
+                    'timestamp'   => Carbon::parse($item->fecha)->timestamp,
+                ];
             });
+            $consolidado = $consolidado->concat($envios);
         }
 
-        if ($fechaInicio && $fechaFin) {
-            $query->whereBetween('fecha', [
-                Carbon::parse($fechaInicio)->toDateString(),
-                Carbon::parse($fechaFin)->toDateString(),
-            ]);
+        if ($servicio === '' || $servicio === 'alquileres') {
+            $alquileresQuery = Alquiler::with(['cliente'])->where('cuenta', 'Cobrado');
+
+            if ($clienteId) {
+                $alquileresQuery->where('cliente_id', (int) $clienteId);
+            }
+            if ($buscar !== '') {
+                $alquileresQuery->whereHas('cliente', function ($q) use ($buscar) {
+                    $q->where('nombre', 'like', "%{$buscar}%")->orWhere('dni', 'like', "%{$buscar}%");
+                });
+            }
+            if ($fechaInicio && $fechaFin) {
+                $fInicio = Carbon::parse($fechaInicio)->toDateString();
+                $fFin    = Carbon::parse($fechaFin)->toDateString();
+                $alquileresQuery->whereBetween('dia', [$fInicio, $fFin]);
+            }
+
+            $alquileres = $alquileresQuery->get()->map(function ($item) {
+                return [
+                    'id'          => $item->id,
+                    'fecha'       => $item->dia,
+                    'cliente'     => $item->cliente ? $item->cliente->nombre : 'Sin cliente',
+                    'dni'         => $item->cliente ? $item->cliente->dni : '-',
+                    'telefono'    => $item->cliente ? $item->cliente->telefono : '-',
+                    'referencia'  => 'Alquiler Contado',
+                    'tipo_origen' => 'Alquiler',
+                    'metodo_pago' => $item->destino_pago ?? 'Efectivo',
+                    'monto'       => (float) $item->importe_proyecto,
+                    'timestamp'   => Carbon::parse($item->dia)->timestamp,
+                ];
+            });
+            $consolidado = $consolidado->concat($alquileres);
         }
 
-        // Encabezados limpios sin glosa confusa
+        $consolidado = $consolidado->sortByDesc('timestamp')->values();
+
         $headers = [
             'ID',
             'Fecha',
             'Cliente',
             'DNI / Documento',
-            'Telefono',
-            'Guía / Envío',
+            'Teléfono',
+            'Referencia (Guía / Envío)',
+            'Tipo Movimiento',
             'Método Pago',
-            'Monto Cobrado',
+            'Monto Recaudado',
         ];
 
-        $abonos = $query->get();
-
-        $rows = $abonos->map(function (CuentaCorriente $mov): array {
-            $guia = $mov->envio?->guia ?? $mov->envio?->codigo ?? '-';
-
+        $rows = $consolidado->map(function ($mov) {
             return [
-                $mov->id,
-                $mov->fecha ? Carbon::parse($mov->fecha)->format('d/m/Y') : '-',
-                $mov->cliente?->nombre ?? 'Sin cliente',
-                $mov->cliente?->dni ?? '-',
-                $mov->cliente?->telefono ?? '-',
-                $guia,
-                $mov->metodo_pago ?? 'Efectivo',
-                number_format((float) $mov->monto, 2, '.', ''),
+                $mov['id'],
+                $mov['fecha'] ? Carbon::parse($mov['fecha'])->format('d/m/Y') : '-',
+                $mov['cliente'],
+                $mov['dni'],
+                $mov['telefono'],
+                $mov['referencia'],
+                $mov['tipo_origen'],
+                $mov['metodo_pago'],
+                number_format($mov['monto'], 2, '.', ''),
             ];
         });
 
         $content = $this->xlsx($headers, $rows->all(), 'AuditoriaCobros', 'TablaCobros');
-        $filename = 'auditoria_cobros_'.now()->format('Y-m-d_H-i-s').'.xlsx';
+        $filename = 'auditoria_cobros_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
 
         return response($content, 200, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
             'Content-Length' => (string) strlen($content),
         ]);
     }

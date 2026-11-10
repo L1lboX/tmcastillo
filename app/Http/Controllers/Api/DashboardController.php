@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Envio;
 use App\Models\EnvioItem;
+use App\Models\Alquiler;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Http\JsonResponse;
@@ -37,7 +38,7 @@ class DashboardController extends Controller
             $hasta = Carbon::now()->endOfWeek(Carbon::SUNDAY)->toDateString();
         }
 
-        // 1. Totales y KPIs del período
+        // 1. Totales y KPIs del período (Envíos)
         $metricas = Envio::query()
             ->whereBetween('fecha', [$desde, $hasta])
             ->selectRaw('
@@ -46,13 +47,26 @@ class DashboardController extends Controller
                 COALESCE(SUM(costo_transportista), 0) as total_fletes
             ')
             ->first();
+            
+        // 1.1 Totales y KPIs de Alquileres (Solo Cobrados)
+        $metricasAlquiler = Alquiler::query()
+            ->whereBetween('dia', [$desde, $hasta])
+            ->where('cuenta', 'Cobrado')
+            ->selectRaw('
+                COUNT(id) as total_alquileres,
+                COALESCE(SUM(importe_proyecto), 0) as total_ingresos
+            ')
+            ->first();
 
-        $ingresos = (float) ($metricas->total_ingresos ?? 0);
+        // 1.2 Suma Maestra
+        $ingresos = (float) ($metricas->total_ingresos ?? 0) + (float) ($metricasAlquiler->total_ingresos ?? 0);
         $fletes = (float) ($metricas->total_fletes ?? 0);
         $utilidad = $ingresos - $fletes;
         $margenPct = $ingresos > 0 ? round(($utilidad / $ingresos) * 100, 1) : 0.0;
+        
+        $totalOperaciones = (int) ($metricas->total_envios ?? 0) + (int) ($metricasAlquiler->total_alquileres ?? 0);
 
-        // 2. Serie diaria para el gráfico de barras y línea
+        // 2. Serie diaria (Envíos)
         $serieDiaria = Envio::query()
             ->whereBetween('fecha', [$desde, $hasta])
             ->groupBy('fecha')
@@ -64,6 +78,18 @@ class DashboardController extends Controller
             ')
             ->get()
             ->keyBy(fn($row) => Carbon::parse($row->fecha)->toDateString());
+            
+        // 2.1 Serie diaria (Alquileres Cobrados)
+        $serieDiariaAlquiler = Alquiler::query()
+            ->whereBetween('dia', [$desde, $hasta])
+            ->where('cuenta', 'Cobrado')
+            ->groupBy('dia')
+            ->selectRaw('
+                dia as fecha,
+                COALESCE(SUM(importe_proyecto), 0) as ingreso
+            ')
+            ->get()
+            ->keyBy(fn($row) => Carbon::parse($row->fecha)->toDateString());
 
         $chartLabels = [];
         $chartIngresos = [];
@@ -72,16 +98,22 @@ class DashboardController extends Controller
 
         foreach (CarbonPeriod::create($desde, $hasta) as $dia) {
             $fStr = $dia->toDateString();
+            
             $item = $serieDiaria->get($fStr);
+            $itemAlq = $serieDiariaAlquiler->get($fStr);
+            
             $chartLabels[] = ucfirst($dia->isoFormat('ddd D'));
-            $ing = (float) ($item->ingreso ?? 0);
+            
+            // Sumamos los ingresos de envíos y alquileres para el mismo día
+            $ing = ((float) ($item->ingreso ?? 0)) + ((float) ($itemAlq->ingreso ?? 0));
             $fle = (float) ($item->flete ?? 0);
+            
             $chartIngresos[] = round($ing, 2);
             $chartFletes[] = round($fle, 2);
             $chartGanancia[] = round($ing - $fle, 2);
         }
 
-        // 3. Top 5 Clientes con mayor deuda (filtrando envíos pendientes)
+        // 3. Top 5 Clientes con mayor deuda 
         $topClientesDeudores = Envio::query()
             ->join('clientes', 'envios.cliente_id', '=', 'clientes.id')
             ->where(function ($q) {
@@ -99,7 +131,7 @@ class DashboardController extends Controller
             ')
             ->get();
 
-        // 4. Top 5 Transportistas a quienes más se les debe (fletes sin liquidar)
+        // 4. Top 5 Transportistas a quienes más se les debe
         $topTransportistasDeuda = EnvioItem::query()
             ->join('envios', 'envio_items.envio_id', '=', 'envios.id')
             ->join('transportistas', 'envio_items.transportista_id', '=', 'transportistas.id')
@@ -127,7 +159,7 @@ class DashboardController extends Controller
                 'fletes'       => round($fletes, 2),
                 'utilidad'     => round($utilidad, 2),
                 'margen_pct'   => $margenPct,
-                'total_envios' => (int) ($metricas->total_envios ?? 0),
+                'total_envios' => $totalOperaciones, // Ahora también cuenta los alquileres en el contador visual
             ],
             'chart' => [
                 'labels'   => $chartLabels,

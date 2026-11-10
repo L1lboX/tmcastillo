@@ -146,12 +146,12 @@
 
                     <section class="table-shell">
                         <div class="table-tools">
-                                <label class="search-field">
-                                    <span>Buscar cliente</span>
-                                    <input id="client-search" type="search" placeholder="Nombre o documento">
-                                </label>
-                            </div>
-                            <div class="table-scroll">
+                            <label class="search-field">
+                                <span>Buscar cliente</span>
+                                <input id="client-search" type="search" placeholder="Nombre o documento">
+                            </label>
+                        </div>
+                        <div class="table-scroll">
                             <table>
                                 <thead>
                                     <tr>
@@ -167,7 +167,7 @@
                                 <tbody id="clients-list"></tbody>
                             </table>
                         </div>
-                            <div id="clients-pagination" class="pagination-wrapper"></div>
+                        <div id="clients-pagination" class="pagination-wrapper"></div>
                     </section>
                 </section>
 
@@ -185,12 +185,12 @@
 
                         <section class="table-shell">
                             <div class="table-tools">
-                                    <label class="search-field">
-                                        <span>Buscar transportista</span>
-                                        <input id="carrier-search" type="search" placeholder="Nombre o documento">
-                                    </label>
-                                </div>
-                                <div class="table-scroll">
+                                <label class="search-field">
+                                    <span>Buscar transportista</span>
+                                    <input id="carrier-search" type="search" placeholder="Nombre o documento">
+                                </label>
+                            </div>
+                            <div class="table-scroll">
                                 <table>
                                     <thead>
                                         <tr>
@@ -247,21 +247,20 @@
                             </button>
                         </div>
 
-                        <!-- 3. Contenedor 1: Tabla de pendientes (envuelve la que ya tenías) -->
                         <div id="carrier-tab-content-pendientes">
                             <section class="table-shell">
                                 <div class="table-scroll">
                                     <table>
                                         <thead>
-                                        <tr>
-                                            <th>ID Envío</th>
-                                            <th>Fecha</th>
-                                            <th>Items</th>
-                                            <th>Costo</th>
-                                            <th>Estado</th>
-                                            <th>Liquidado</th>
-                                            <th>Acciones</th>
-                                        </tr>
+                                            <tr>
+                                                <th>ID Envío</th>
+                                                <th>Fecha</th>
+                                                <th>Items</th>
+                                                <th>Costo</th>
+                                                <th>Estado</th>
+                                                <th>Liquidado</th>
+                                                <th>Acciones</th>
+                                            </tr>
                                         </thead>
                                         <tbody id="gestion-envios-list"></tbody>
                                     </table>
@@ -273,21 +272,20 @@
                             </div>
                         </div>
 
-                        <!-- 4. Contenedor 2: Tabla de historial auditado (nueva, oculta por defecto) -->
                         <div id="carrier-tab-content-historial" class="hidden">
                             <section class="table-shell">
                                 <div class="table-scroll">
                                     <table>
                                         <thead>
-                                        <tr>
-                                            <th>N° Recibo</th>
-                                            <th>Fecha y Hora</th>
-                                            <th>Monto Abonado</th>
-                                            <th>Bultos / Ítems</th>
-                                            <th>Observación</th>
-                                            <th>Autorizado por</th>
-                                            <th style="text-align: right;">Acciones</th>
-                                        </tr>
+                                            <tr>
+                                                <th>N° Recibo</th>
+                                                <th>Fecha y Hora</th>
+                                                <th>Monto Abonado</th>
+                                                <th>Bultos / Ítems</th>
+                                                <th>Observación</th>
+                                                <th>Autorizado por</th>
+                                                <th style="text-align: right;">Acciones</th>
+                                            </tr>
                                         </thead>
                                         <tbody id="gestion-pagos-historial-list"></tbody>
                                     </table>
@@ -302,8 +300,108 @@
                                 </div>
                             </div>
                         </div>
-
                     </div>
+                </section>
+
+                <!-- ================= MÓDULO: MAQUINARIAS ================= -->
+                <section class="module-page hidden" data-page="maquinarias">
+                    <section class="page-head">
+                        <div>
+                            <h1>Maquinarias</h1>
+                            <p>Registro y control de estado de maquinarias para alquiler.</p>
+                        </div>
+                        @can('maquinarias.manage')
+                            <button class="button button-primary button-with-icon icon-add" id="btn-open-maquinaria-modal" type="button">Nueva maquinaria</button>
+                        @endcan
+                    </section>
+
+                    <section class="table-shell">
+                        <div class="table-tools">
+                            <label class="search-field">
+                                <span>Buscar maquinaria</span>
+                                <input id="maquinaria-search" type="search" placeholder="Placa o descripción">
+                            </label>
+                        </div>
+                        <div class="table-scroll">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Placa / Código</th>
+                                        <th>Descripción</th>
+                                        <th>Estado</th>
+                                        <th style="text-align: right;">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="maquinarias-list"></tbody>
+                            </table>
+                        </div>
+                        <div id="maquinarias-pagination" class="pagination-wrapper"></div>
+                    </section>
+                </section>
+
+                <!-- ================= MÓDULO: ALQUILERES ================= -->
+                <section class="module-page hidden" data-page="alquileres">
+                    <section class="page-head page-head-compact">
+                        <div class="head-actions">
+                            @can('alquileres.export')
+                                <button class="button button-with-icon icon-download" id="btn-export-alquileres" type="button">Exportar Excel</button>
+                            @endcan
+                            @can('alquileres.create')
+                                <button class="button button-primary button-with-icon icon-add" id="btn-open-alquiler-modal" type="button">Nuevo alquiler</button>
+                            @endcan
+                        </div>
+                    </section>
+
+                    <section class="table-shell">
+                        <div class="table-tools table-tools-bar">
+                            <div class="tool-group">
+                                <label class="search-field">
+                                    <span>Buscar</span>
+                                    <input id="alquiler-search-input" type="search" placeholder="Cliente, maquinaria, contrato o recibo">
+                                </label>
+                                <button class="button button-with-icon icon-filter" id="btn-toggle-alquiler-filters" type="button" aria-expanded="false">Filtros</button>
+                            </div>
+                            <div class="tool-group filter-panel" id="alquiler-filter-panel">
+                                <label>
+                                    <span>Desde</span>
+                                    <input id="filter-alquiler-desde" type="date">
+                                </label>
+                                <label>
+                                    <span>Hasta</span>
+                                    <input id="filter-alquiler-hasta" type="date">
+                                </label>
+                                <label>
+                                    <span>Estado pago</span>
+                                    <select id="filter-alquiler-pago">
+                                        <option value="">Todos</option>
+                                        <option value="Pendiente">Pendiente</option>
+                                        <option value="Cobrado">Cobrado</option>
+                                    </select>
+                                </label>
+                                <button class="button button-with-icon icon-clear" id="btn-clear-alquiler-filters" type="button">Limpiar filtros</button>
+                            </div>
+                        </div>
+
+                        <div class="table-scroll">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Fecha</th>
+                                        <th>Cliente</th>
+                                        <th>Maquinaria</th>
+                                        <th class="col-hide-mob">Estado</th>
+                                        <th class="col-hide-mob">Total</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="alquileres-tbody"></tbody>
+                            </table>
+                        </div>
+
+                        <div id="alquileres-pagination" class="pagination-wrapper"></div>
+                    </section>
                 </section>
 
                 <section class="module-page hidden" data-page="montos">
@@ -360,22 +458,21 @@
                             <button class="button button-primary button-with-icon icon-add" id="btn-open-abono-modal" type="button">Registrar abono</button>
                         </div>
                         <div class="table-scroll">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Documento</th>
-                                    <th>Cliente</th>
-                                    <th>Telefono</th>
-                                    <th>Saldo pendiente</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="debt-clients-list"></tbody>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Documento</th>
+                                        <th>Cliente</th>
+                                        <th>Telefono</th>
+                                        <th>Saldo pendiente</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="debt-clients-list"></tbody>
                             </table>
                         </div>
                         <div id="clients-pagination" class="pagination-wrapper"></div>
                     </section>
-
                 </section>
 
                 <section class="module-page hidden" data-page="auditoria">
@@ -508,6 +605,15 @@
                                 <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.35rem;">Hasta</label>
                                 <input id="audit-cobro-filter-fin" type="date" class="input" style="width: 100%; background: var(--panel-soft); color: var(--text); border: 1px solid var(--line);">
                             </div>
+
+                            <div style="flex: 1; min-width: 150px;">
+                                <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.35rem;">Servicio / Tipo</label>
+                                <select id="audit-cobro-filter-servicio" class="input" style="width: 100%; background: var(--panel-soft); color: var(--text); border: 1px solid var(--line);">
+                                    <option value="">Todos</option>
+                                    <option value="envios">Solo Envios</option>
+                                    <option value="alquileres">Solo Alquileres</option>
+                                </select>
+                            </div>
                             
                             <button class="button" id="audit-cobro-btn-filtrar" type="button" style="background: var(--accent); color: #000; font-weight: 700; border: none; padding: 0.55rem 1.2rem; border-radius: 6px;">
                                 Filtrar
@@ -550,7 +656,7 @@
                 </section>
 
                 <section class="module-page{{ auth()->user()->cannot('dashboard.view') ? ' hidden' : '' }}" data-page="dashboard">
-                        <!-- Encabezado y Filtro de Fechas -->
+                    <!-- Encabezado y Filtro de Fechas -->
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
                         <div>
                             <h2 style="margin: 0; font-size: 1.5rem; color: var(--text); font-weight: 700; font-family: 'Outfit', sans-serif;">
@@ -622,7 +728,6 @@
 
                     <!-- Franja 3: Top 5 Cuentas Clave (Riesgo y Liquidez) -->
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 18px;">
-                        
                         <!-- Top 5 Clientes Deudores -->
                         <div style="background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: flex; flex-direction: column;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid var(--line); padding-bottom: 10px;">
@@ -656,7 +761,6 @@
                                 <div style="text-align: center; padding: 20px; color: var(--muted); font-size: 0.85rem;">Consultando fletes...</div>
                             </div>
                         </div>
-
                     </div>
                 </section>
 
@@ -925,7 +1029,7 @@
                     <div class="form-grid two">
                         <label>
                             <span>Fecha</span>
-                            <input type="date" id="f-fecha" readonly>
+                            <input type="date" id="f-fecha">
                         </label>
                         <label>
                             <span>ID</span>
@@ -985,7 +1089,6 @@
                     </div>
                 </div>
 
-                <!-- AHORA ITEMS ES EL 03 (Se ubicará a la izquierda debajo de Fecha) -->
                 <div class="form-section form-section-items-modal">
                     <div class="items-modal-header">
                         <h3>03 Items del envío</h3>
@@ -1003,14 +1106,11 @@
                                     <th style="width: 45px; text-align: center;"></th>
                                 </tr>
                             </thead>
-                            <tbody id="items-container">
-                                <!-- Se inyectan las filas aquí -->
-                            </tbody>
+                            <tbody id="items-container"></tbody>
                         </table>
                     </div>
                 </div>
 
-                <!-- AHORA TRANSPORTISTA ES EL 04 (Se ubicará a la derecha debajo de Cliente) -->
                 <div class="form-section">
                     <h3>04 Transportista</h3>
                     <input type="hidden" id="f-transportista-id">
@@ -1050,7 +1150,6 @@
                 </footer>
             </form>
         </section>
-
     </div>
 
     @can('users.manage')
@@ -1174,35 +1273,81 @@
     @endcan
 
     @can('clientes.debt')
-        <div class="modal-backdrop" id="abono-modal" aria-hidden="true">
-            <section class="modal modal-small" role="dialog" aria-modal="true" aria-labelledby="abono-modal-title">
+        <<div class="modal-backdrop" id="abono-modal" aria-hidden="true">
+            <section class="modal modal-small" role="dialog" aria-modal="true" aria-labelledby="abono-modal-title" style="max-width: 520px; width: 95%;">
                 <header class="modal-head">
                     <h2 id="abono-modal-title">Registrar abono</h2>
                     <button class="button button-with-icon icon-close" id="btn-close-abono-modal" type="button">Cerrar</button>
                 </header>
 
-                <form id="abono-form" class="modal-body">
-                    <div class="amount-summary" id="abono-summary"></div>
-                    <div class="form-grid two">
+                <form id="abono-form" class="modal-body" style="display: flex; flex-direction: column; gap: 1rem;">
+                    <input id="abono-cliente-id" type="hidden">
+
+                    <!-- Panel Dinámico de Saldos -->
+                    <div style="background: var(--panel-soft); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <strong id="abono-card-nombre" style="font-size: 0.95rem; color: var(--text);">-</strong>
+                            <span id="abono-badge-cuenta" class="badge pagado" style="font-size: 0.72rem; text-transform: uppercase;">Línea Envíos</span>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 8px; margin-bottom: 8px;">
+                            <span style="font-size: 0.8rem; color: var(--muted);">Saldo a liquidar:</span>
+                            <span id="abono-saldo-activo" style="font-size: 1.35rem; font-weight: 800; color: #f59e0b; font-family: 'Outfit', sans-serif;">S/ 0.00</span>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.78rem;">
+                            <div id="box-sub-envios" style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2); padding: 5px 8px; border-radius: 5px; cursor: pointer;">
+                                <span style="color: var(--muted); display: block;">Deuda Envíos</span>
+                                <strong id="abono-sub-envios" style="color: #38bdf8;">S/ 0.00</strong>
+                            </div>
+                            <div id="box-sub-alquileres" style="background: var(--panel); border: 1px solid var(--line); padding: 5px 8px; border-radius: 5px; cursor: pointer;">
+                                <span style="color: var(--muted); display: block;">Deuda Alquiler</span>
+                                <strong id="abono-sub-alquileres" style="color: var(--text);">S/ 0.00</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Campos del Formulario -->
+                    <div class="form-grid two" style="gap: 0.85rem;">
                         <label class="span-2">
-                            <span>Cliente</span>
-                            <input id="abono-cliente-id" type="hidden">
-                            <input id="abono-cliente-nombre" type="text" readonly placeholder="Cliente seleccionado">
+                            <span>Cuenta a amortizar *</span>
+                            <select id="abono-origen" required style="font-weight: 600; color: var(--accent);">
+                                <option value="envios">Línea Envíos (Encomiendas / Carga)</option>
+                                <option value="alquileres">Línea Alquileres (Maquinaria)</option>
+                            </select>
                         </label>
+
                         <label>
-                            <span>Monto abono</span>
-                            <input id="abono-monto" type="number" min="0.01" step="0.01" placeholder="100.00">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                <span>Monto abono (S/) *</span>
+                                <button type="button" id="btn-abono-saldar-todo" style="background: none; border: none; color: var(--accent); font-size: 0.72rem; cursor: pointer; text-decoration: underline; padding: 0;">Saldar todo</button>
+                            </div>
+                            <input id="abono-monto" type="number" min="0.01" step="0.01" placeholder="0.00" required>
                         </label>
+
                         <label>
-                            <span>Fecha</span>
-                            <input id="abono-fecha" type="date">
+                            <span>Fecha *</span>
+                            <input id="abono-fecha" type="date" required>
                         </label>
+
                         <label class="span-2">
-                            <span>Observacion</span>
-                            <input id="abono-observacion" type="text" placeholder="Nota opcional">
+                            <span>Método / Destino de pago *</span>
+                            <select id="abono-metodo-pago" required>
+                                <option value="Efectivo Jorge">Efectivo Jorge</option>
+                                <option value="Yape">Yape</option>
+                                <option value="BCO">BCO</option>
+                                <option value="Continental">Continental</option>
+                                <option value="Piura">Piura</option>
+                            </select>
+                        </label>
+
+                        <label class="span-2">
+                            <span>Observación / Referencia (Opcional)</span>
+                            <input id="abono-observacion" type="text" placeholder="Ej. Depósito BCP #12345">
                         </label>
                     </div>
-                    <footer class="modal-actions">
+
+                    <footer class="modal-actions" style="margin-top: 0.5rem;">
                         <button class="button button-with-icon icon-cancel" id="btn-cancel-abono-modal" type="button">Cancelar</button>
                         <button class="button button-primary button-with-icon icon-save" type="submit">Guardar abono</button>
                     </footer>
@@ -1211,32 +1356,232 @@
         </div>
 
         <div class="modal-backdrop" id="movements-modal" aria-hidden="true">
-            <section class="modal modal-small" role="dialog" aria-modal="true" aria-labelledby="movements-modal-title">
+            <section class="modal modal-medium" role="dialog" aria-modal="true" aria-labelledby="movements-modal-title" style="max-width: 950px; width: 95%;">
                 <header class="modal-head">
                     <h2 id="movements-modal-title">Movimientos del cliente</h2>
                     <button class="button button-with-icon icon-close" id="btn-close-movements-modal" type="button">Cerrar</button>
                 </header>
+
                 <div class="modal-body">
                     <div class="amount-summary" id="movements-summary" style="margin-bottom: 1rem;"></div>
-                    <div class="table-scroll" style="max-height: 50vh;">
+
+                    <!-- Pestañas de Subcuentas -->
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 1px solid var(--line); padding-bottom: 0.5rem;">
+                        <button type="button" class="button" id="tab-mov-todos" style="font-size: 0.82rem; padding: 0.35rem 0.85rem; background: var(--accent); color: #000; font-weight: 700;">
+                            Todos (Consolidado)
+                        </button>
+                        <button type="button" class="button" id="tab-mov-envios" style="font-size: 0.82rem; padding: 0.35rem 0.85rem; background: var(--panel-soft); color: var(--text);">
+                            Línea Envíos
+                        </button>
+                        <button type="button" class="button" id="tab-mov-alquileres" style="font-size: 0.82rem; padding: 0.35rem 0.85rem; background: var(--panel-soft); color: var(--text);">
+                            Línea Alquileres
+                        </button>
+                    </div>
+
+                    <div class="table-container" style="max-height: 420px; overflow-y: auto;">
                         <table>
                             <thead>
                                 <tr>
                                     <th>Fecha</th>
                                     <th>Tipo</th>
-                                    <th>Envio</th>
+                                    <th>Origen / Ref.</th>
                                     <th>Monto</th>
-                                    <th>Saldo acumulado</th>
-                                    <th>Observacion</th>
+                                    <th>Saldo Acum.</th>
+                                    <th>Observación</th>
                                 </tr>
                             </thead>
-                            <tbody id="movements-modal-list"></tbody>
+                            <tbody id="movements-modal-list">
+                                <tr><td class="empty-state" colspan="6">Cargando...</td></tr>
+                            </tbody>
                         </table>
                     </div>
                 </div>
             </section>
         </div>
     @endcan
+
+    <!-- ================= MODAL: MAQUINARIA (PLACA Y DESCRIPCIÓN) ================= -->
+    <div class="modal-backdrop" id="maquinaria-modal" aria-hidden="true">
+        <section class="modal modal-small" role="dialog" aria-modal="true" aria-labelledby="maquinaria-modal-title">
+            <header class="modal-head">
+                <h2 id="maquinaria-modal-title">Registrar maquinaria</h2>
+                <button class="button button-with-icon icon-close" id="btn-close-maquinaria-modal" type="button">Cerrar</button>
+            </header>
+
+            <form id="maquinaria-form" class="modal-body">
+                <input type="hidden" id="maquinaria-id">
+                <div class="form-grid two">
+                    <label class="span-2">
+                        <span>Placa / Código</span>
+                        <input id="maquinaria-placa" type="text" maxlength="20" placeholder="Ej. ABC-123 o RET-01" required>
+                    </label>
+                    <label class="span-2">
+                        <span>Descripción</span>
+                        <textarea id="maquinaria-descripcion" rows="3" placeholder="Ej. Retroexcavadora Caterpillar 420F" required></textarea>
+                    </label>
+                </div>
+                <footer class="modal-actions">
+                    <button class="button button-with-icon icon-cancel" id="btn-cancel-maquinaria-modal" type="button">Cancelar</button>
+                    <button class="button button-primary button-with-icon icon-save" type="submit">Guardar maquinaria</button>
+                </footer>
+            </form>
+        </section>
+    </div>
+
+    <!-- ================= MODAL: REGISTRAR ALQUILER ================= -->
+    <div class="modal-backdrop" id="alquiler-modal" aria-hidden="true">
+        <section class="modal modal-medium" role="dialog" aria-modal="true" aria-labelledby="alquiler-modal-title" style="max-width: 900px; width: 95%;">
+            <header class="modal-head">
+                <h2 id="alquiler-modal-title">Registrar alquiler</h2>
+                <button class="button button-with-icon icon-close" id="btn-close-alquiler-modal" type="button">Cerrar</button>
+            </header>
+
+            <form id="alquiler-form" class="modal-body" style="display: flex; flex-direction: column; gap: 1.15rem;">
+                <input type="hidden" id="alquiler-db-id">
+
+                <!-- Bloques Superiores en 2 Columnas -->
+                <div class="form-grid two" style="gap: 1.5rem; align-items: start;">
+                    
+                    <!-- ================= COLUMNA IZQUIERDA (01, 02, 03) ================= -->
+                    <div style="display: flex; flex-direction: column; gap: 1.15rem;">
+                        
+                        <!-- 01 Fecha -->
+                        <div class="form-section" style="margin: 0;">
+                            <h3>01 Fecha</h3>
+                            <label>
+                                <span>Fecha de registro</span>
+                                <input type="date" id="alquiler-fecha">
+                            </label>
+                        </div>
+
+                        <!-- 02 Cliente y Proyecto -->
+                        <div class="form-section" style="margin: 0;">
+                            <h3>02 Cliente y Proyecto</h3>
+                            <input type="hidden" id="alquiler-cliente-id">
+                            
+                            <div class="client-lookup" style="margin-bottom: 0.65rem;">
+                                <label class="field-relative">
+                                    <span>Cliente / búsqueda *</span>
+                                    <input type="text" id="alquiler-cliente-search" autocomplete="off" placeholder="Buscar por DNI o nombre..." required>
+                                    <div class="dropdown" id="alquiler-cliente-dropdown"></div>
+                                </label>
+                            </div>
+                            <small id="alquiler-cliente-status" style="color: var(--muted); margin-top: -0.4rem; margin-bottom: 0.4rem; display: block; font-size: 0.75rem;"></small>
+
+                            <div class="client-lookup">
+                                <label class="field-relative">
+                                    <span>Proyecto / Obra (Opcional)</span>
+                                    <input type="text" id="alquiler-proyecto-search" autocomplete="off" placeholder="Escribe o busca un proyecto...">
+                                    <div class="dropdown" id="alquiler-proyecto-dropdown"></div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- 03 Maquinaria -->
+                        <div class="form-section" style="margin: 0;">
+                            <h3>03 Maquinaria</h3>
+                            <input type="hidden" id="alquiler-maquinaria-id">
+                            <div class="client-lookup">
+                                <label class="field-relative">
+                                    <span>Maquinaria / Búsqueda *</span>
+                                    <input 
+                                        type="text" 
+                                        id="alquiler-maquinaria-search" 
+                                        autocomplete="off" 
+                                        placeholder="Escribe al menos 2 letras o placa..." 
+                                        required>
+                                    <div class="dropdown" id="alquiler-maquinaria-dropdown"></div>
+                                </label>
+                            </div>
+                            <small id="alquiler-maquinaria-status" style="color: var(--muted); margin-top: 4px; display: block; font-size: 0.75rem;"></small>
+                        </div>
+
+                    </div>
+
+                    <!-- ================= COLUMNA DERECHA (04, 05) ================= -->
+                    <div style="display: flex; flex-direction: column; gap: 1.15rem;">
+                        
+                        <!-- 04 Tiempo y Tarifa -->
+                        <div class="form-section" style="margin: 0;">
+                            <h3>04 Tiempo y Tarifa</h3>
+                            <div class="form-grid two" style="margin-bottom: 0.65rem;">
+                                <label>
+                                    <span>Tiempo (horas/días) *</span>
+                                    <input type="number" id="alquiler-tiempo" min="0.5" step="0.5" placeholder="Cant. tiempo" required>
+                                </label>
+                                <label>
+                                    <span>Tarifa unitaria (S/) *</span>
+                                    <input type="number" id="alquiler-precio" min="0" step="0.01" placeholder="0.00" required>
+                                </label>
+                            </div>
+                            <label>
+                                <span>Importe estimado (S/)</span>
+                                <input type="text" id="alquiler-preview-importe" readonly placeholder="0.00" style="background: var(--panel-soft); font-weight: 700; color: var(--accent); font-size: 1.1rem;">
+                            </label>
+                        </div>
+
+                        <!-- 05 Facturación y Pago -->
+                        <div class="form-section" style="margin: 0;">
+                            <h3>05 Facturación y Pago</h3>
+                            <div class="form-grid two" style="margin-bottom: 0.65rem;">
+                                <label>
+                                    <span>Estado de cobro *</span>
+                                    <select id="alquiler-estado-pago" required>
+                                        <option value="Cobrado">Cobrado</option>
+                                        <option value="Pendiente">Pendiente</option>
+                                    </select>
+                                </label>
+                                <label>
+                                    <span>Método Pago</span>
+                                    <select id="alquiler-metodo-pago">
+                                        <option value="Efectivo Jorge">Efectivo Jorge</option>
+                                        <option value="Yape">Yape</option>
+                                        <option value="BCO">BCO</option>
+                                        <option value="Continental">Continental</option>
+                                        <option value="Piura">Piura</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <label>
+                                <span>Tipo de comprobante</span>
+                                <select id="alquiler-comprobante">
+                                    <option value="S. CP">S. CP (Sin Comprobante)</option>
+                                    <option value="Factura">Factura</option>
+                                </select>
+                            </label>
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- ================= 06 OBSERVACIONES (ANCHO COMPLETO INFERIOR) ================= -->
+                <div class="form-section" style="margin: 0; width: 100%;">
+                    <h3>06 Observaciones</h3>
+                    <label style="width: 100%;">
+                        <span>Notas / Lugar de trabajo</span>
+                        <textarea id="alquiler-obs" rows="2" style="width: 100%; resize: vertical;" placeholder="Lugar de trabajo, operador asignado o notas internas..."></textarea>
+                    </label>
+                </div>
+
+                <footer class="modal-actions" style="margin-top: 0.5rem;">
+                    <button class="button button-with-icon icon-cancel" id="btn-cancel-alquiler" type="button">Cancelar</button>
+                    <button class="button button-primary button-with-icon icon-save" type="submit">Guardar alquiler</button>
+                </footer>
+            </form>
+        </section>
+    </div>
+
+    <!-- ================= MODAL: DETALLE DE ALQUILER (OJITO) ================= -->
+    <div class="modal-backdrop" id="alquiler-details-modal" aria-hidden="true">
+        <section class="modal modal-small" role="dialog" aria-modal="true" aria-labelledby="alquiler-details-title">
+            <header class="modal-head">
+                <h2 id="alquiler-details-title">Detalle del alquiler</h2>
+                <button class="button button-with-icon icon-close" id="btn-close-alquiler-details" type="button">Cerrar</button>
+            </header>
+            <div class="modal-body details-body" id="alquiler-details-body"></div>
+        </section>
+    </div>
 
     <div class="modal-backdrop" id="confirm-modal" aria-hidden="true">
         <section class="modal modal-small" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
