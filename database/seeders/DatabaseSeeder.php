@@ -74,16 +74,6 @@ class DatabaseSeeder extends Seeder
             return [$name => $role];
         });
 
-        $admin = User::query()->updateOrCreate([
-            'email' => env('ADMIN_EMAIL', 'admin@transportescastillo.local'),
-        ], [
-            'name' => env('ADMIN_NAME', 'Super Admin'),
-            'username' => env('ADMIN_USERNAME', 'admin'),
-            'password' => Hash::make(env('ADMIN_PASSWORD', 'admin12345')),
-            'active' => true,
-        ]);
-        $admin->roles()->syncWithoutDetaching([$roleModels['super_admin']->id]);
-
         Cliente::query()->updateOrCreate([
             'dni' => '12345678',
         ], [

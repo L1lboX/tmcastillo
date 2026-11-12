@@ -12,6 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('alquileres', function (Blueprint $table) {
+	    $table->engine = 'InnoDB';
             $table->id();
             $table->date('dia');
             $table->foreignId('cliente_id')->constrained('clientes')->onDelete('restrict');

@@ -12,7 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('maquinarias', function (Blueprint $table) {
-            $table->id();
+            $table->engine = 'InnoDB';
+	    $table->id();
             $table->string('placa', 20)->unique();
             $table->string('descripcion', 150)->nullable();
             $table->boolean('activo')->default(true);
