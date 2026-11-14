@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\ClienteController;
 use App\Http\Controllers\Api\CuentaCorrienteController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\EnvioController;
+use App\Http\Controllers\Api\GastoController;
 use App\Http\Controllers\Api\MaquinariaController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\TransportistaController;
@@ -181,6 +182,15 @@ Route::middleware('auth')->prefix('api')->group(function (): void {
     Route::get('/auditoria/clientes/buscar-rapido', [AuditoriaCobroController::class, 'autocompletarClientes']);
     Route::get('/auditoria/transportistas/export', [AuditoriaPagoController::class, 'export']);  
     Route::get('/auditoria/cobros/export', [AuditoriaCobroController::class, 'export']);
+
+    // Gastos Operativos
+    Route::get('/gastos/buscar-destinos', [GastoController::class, 'buscarDestinos']);
+    Route::get('/gastos/export', [GastoController::class, 'export']);
+    Route::get('/gastos', [GastoController::class, 'index']);
+    Route::get('/gastos/{gasto}', [GastoController::class, 'show']);
+    Route::post('/gastos', [GastoController::class, 'store']);
+    Route::put('/gastos/{gasto}', [GastoController::class, 'update']);
+    Route::delete('/gastos/{gasto}', [GastoController::class, 'destroy']);
 
     // Dashboard
     Route::get('/dashboard/ganancias', [DashboardController::class, 'ganancias'])

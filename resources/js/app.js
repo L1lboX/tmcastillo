@@ -284,6 +284,8 @@ function bindEvents() {
     on("#btn-open-abono-modal", "click", openAbonoModal);
     on("#btn-close-abono-modal", "click", closeAbonoModal);
     on("#btn-cancel-abono-modal", "click", closeAbonoModal);
+    on("#btn-close-gasto-modal", "click", closeGastoModal);
+    on("#btn-cancel-gasto-modal", "click", closeGastoModal);
     on("#abono-form", "submit", saveAbono);
     on("#btn-close-movements-modal", "click", closeMovementsModal);
     on("#btn-close-gestion", "click", closeGestion);
@@ -352,6 +354,9 @@ function bindEvents() {
     });
     $("#carrier-details-modal")?.addEventListener("click", (event) => {
         if (event.target.id === "carrier-details-modal") closeCarrierDetailsModal();
+    });
+    $("#gasto-modal")?.addEventListener("click", (event) => {
+        if (event.target.id === "gasto-modal") closeGastoModal();
     });
     
 
@@ -3309,13 +3314,16 @@ async function loadDashboardGanancias() {
         const elIngresos = document.getElementById("kpi-ingresos");
         const elVolumen = document.getElementById("kpi-volumen");
         const elCostos = document.getElementById("kpi-costos");
+        const elCostosSub = document.getElementById("kpi-costos-sub");
         const elUtilidad = document.getElementById("kpi-utilidad");
         const elMargen = document.getElementById("kpi-margen");
 
         if (elIngresos) elIngresos.textContent = sol(kpi.ingresos);
         if (elVolumen) elVolumen.textContent = `${kpi.total_envios} despachos`;
-        if (elCostos) elCostos.textContent = sol(kpi.fletes);
-        if (elUtilidad) elUtilidad.textContent = sol(kpi.utilidad);
+        const egresosTotales = kpi.egresos_totales !== undefined ? kpi.egresos_totales : (kpi.fletes + (kpi.gastos || 0));
+        if (elCostos) elCostos.textContent = sol(egresosTotales);
+        if (elCostosSub) elCostosSub.textContent = `Fletes (${sol(kpi.fletes)}) + Gastos (${sol(kpi.gastos || 0)})`;
+        if (elUtilidad) elUtilidad.textContent = sol(kpi.utilidad_real ?? kpi.utilidad);
         if (elMargen) elMargen.textContent = `${kpi.margen_pct}%`;
 
         const topCliBody = document.getElementById("dash-top-clientes-body");
@@ -3399,7 +3407,7 @@ async function loadDashboardGanancias() {
                             order: 2,
                         },
                         {
-                            label: 'Costo Fletes (S/)',
+                            label: 'Fletes Transportistas (S/)',
                             data: data.chart.fletes,
                             backgroundColor: 'rgba(239, 100, 100, 0.75)',
                             borderColor: '#ef6464',
@@ -3408,7 +3416,16 @@ async function loadDashboardGanancias() {
                             order: 2,
                         },
                         {
-                            label: 'Margen Neto (S/)',
+                            label: 'Gastos Operativos (S/)',
+                            data: data.chart.gastos || [],
+                            backgroundColor: 'rgba(245, 158, 11, 0.75)',
+                            borderColor: '#f59e0b',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                            order: 2,
+                        },
+                        {
+                            label: 'Utilidad Real (S/)',
                             data: data.chart.ganancia,
                             type: 'line',
                             borderColor: '#c5a043',
@@ -3467,14 +3484,19 @@ async function loadDashboardGanancias() {
 let auditCurrentTab = 'transportistas';
 let auditTransPage = 1;
 let auditCobroPage = 1;
+let auditGastosPage = 1;
 let auditTransChartInstance = null;
 let auditCobroChartInstance = null;
+let auditGastosChartInstance = null;
+let currentGastosList = [];
 
 function setupAuditTabs() {
     const btnTrans = document.getElementById('tab-btn-audit-transportistas');
     const btnCobros = document.getElementById('tab-btn-audit-cobros');
+    const btnGastos = document.getElementById('tab-btn-audit-gastos');
     const contentTrans = document.getElementById('audit-tab-transportistas-content');
     const contentCobros = document.getElementById('audit-tab-cobros-content');
+    const contentGastos = document.getElementById('audit-tab-gastos-content');
 
     if (!btnTrans || !btnCobros) return;
 
@@ -3484,9 +3506,14 @@ function setupAuditTabs() {
         btnTrans.style.color = '#000';
         btnCobros.style.background = 'var(--panel-soft)';
         btnCobros.style.color = 'var(--muted)';
+        if (btnGastos) {
+            btnGastos.style.background = 'var(--panel-soft)';
+            btnGastos.style.color = 'var(--muted)';
+        }
 
         contentTrans.classList.remove('hidden');
         contentCobros.classList.add('hidden');
+        if (contentGastos) contentGastos.classList.add('hidden');
         cargarAuditoriaTransportistas(auditTransPage);
     };
 
@@ -3496,11 +3523,33 @@ function setupAuditTabs() {
         btnCobros.style.color = '#000';
         btnTrans.style.background = 'var(--panel-soft)';
         btnTrans.style.color = 'var(--muted)';
+        if (btnGastos) {
+            btnGastos.style.background = 'var(--panel-soft)';
+            btnGastos.style.color = 'var(--muted)';
+        }
 
         contentCobros.classList.remove('hidden');
         contentTrans.classList.add('hidden');
+        if (contentGastos) contentGastos.classList.add('hidden');
         cargarAuditoriaCobros(auditCobroPage);
     };
+
+    if (btnGastos && contentGastos) {
+        btnGastos.onclick = () => {
+            auditCurrentTab = 'gastos';
+            btnGastos.style.background = 'var(--accent)';
+            btnGastos.style.color = '#000';
+            btnTrans.style.background = 'var(--panel-soft)';
+            btnTrans.style.color = 'var(--muted)';
+            btnCobros.style.background = 'var(--panel-soft)';
+            btnCobros.style.color = 'var(--muted)';
+
+            contentGastos.classList.remove('hidden');
+            contentTrans.classList.add('hidden');
+            contentCobros.classList.add('hidden');
+            cargarAuditoriaGastos(auditGastosPage);
+        };
+    }
 
     const btnFiltroTrans = document.getElementById('audit-trans-btn-filtrar');
     if (btnFiltroTrans) btnFiltroTrans.onclick = () => cargarAuditoriaTransportistas(1);
@@ -3513,6 +3562,15 @@ function setupAuditTabs() {
 
     const btnExportCobros = document.getElementById('audit-cobro-btn-export');
     if (btnExportCobros) btnExportCobros.onclick = () => exportarAuditoriaCobros();
+
+    const btnFiltroGastos = document.getElementById('audit-gasto-btn-filtrar');
+    if (btnFiltroGastos) btnFiltroGastos.onclick = () => cargarAuditoriaGastos(1);
+
+    const btnExportGastos = document.getElementById('audit-gasto-btn-export');
+    if (btnExportGastos) btnExportGastos.onclick = () => exportarAuditoriaGastos();
+
+    const btnNuevoGasto = document.getElementById('audit-gasto-btn-nuevo');
+    if (btnNuevoGasto) btnNuevoGasto.onclick = () => openGastoModal();
 
     const inputBuscarTrans = document.getElementById('audit-trans-filter-buscar');
     if (inputBuscarTrans) {
@@ -3527,6 +3585,16 @@ function setupAuditTabs() {
             if (e.key === 'Enter') cargarAuditoriaCobros(1);
         };
     }
+
+    const inputBuscarGasto = document.getElementById('audit-gasto-filter-buscar');
+    if (inputBuscarGasto) {
+        inputBuscarGasto.onkeyup = (e) => {
+            if (e.key === 'Enter') cargarAuditoriaGastos(1);
+        };
+    }
+
+    setupGastoDestinoSearch();
+    setupGastoFormSubmit();
 }
 
 async function cargarAuditoriaTransportistas(page = 1) {
@@ -3669,6 +3737,293 @@ function exportarAuditoriaCobros() {
     if (servicio) params.append('servicio', servicio); // <-- Adjuntar aquí también
 
     window.location.href = `/api/auditoria/cobros/export?${params.toString()}`;
+}
+
+function openGastoModal(gasto = null) {
+    const form = $("#gasto-form");
+    if (form) form.reset();
+    const dropdown = $("#gasto-destino-autocomplete-list");
+    if (dropdown) {
+        dropdown.style.display = 'none';
+        dropdown.innerHTML = '';
+    }
+
+    if (gasto) {
+        $("#gasto-modal-title").textContent = "Editar Gasto Operativo";
+        $("#gasto-id").value = gasto.id;
+        $("#gasto-fecha").value = gasto.fecha ? (typeof gasto.fecha === 'string' ? gasto.fecha.split('T')[0] : gasto.fecha) : '';
+        $("#gasto-tipo").value = gasto.tipo || '';
+        $("#gasto-monto").value = gasto.monto || '';
+        $("#gasto-destino").value = gasto.destino || '';
+        $("#gasto-detalle").value = gasto.detalle || '';
+    } else {
+        $("#gasto-modal-title").textContent = "Registrar Gasto Operativo";
+        $("#gasto-id").value = '';
+        $("#gasto-fecha").value = new Date().toISOString().split('T')[0];
+        $("#gasto-tipo").value = '';
+        $("#gasto-monto").value = '';
+        $("#gasto-destino").value = '';
+        $("#gasto-detalle").value = '';
+    }
+
+    $("#gasto-modal").classList.add("open");
+    $("#gasto-modal").setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+}
+
+function closeGastoModal() {
+    $("#gasto-modal").classList.remove("open");
+    $("#gasto-modal").setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+    const dropdown = $("#gasto-destino-autocomplete-list");
+    if (dropdown) {
+        dropdown.style.display = 'none';
+        dropdown.innerHTML = '';
+    }
+}
+
+let gastoDestinoSearchTimer = null;
+function setupGastoDestinoSearch() {
+    const inputDestino = document.getElementById('gasto-destino');
+    const dropdown = document.getElementById('gasto-destino-autocomplete-list');
+    if (!inputDestino || !dropdown) return;
+
+    inputDestino.addEventListener('input', () => {
+        clearTimeout(gastoDestinoSearchTimer);
+        const val = inputDestino.value.trim();
+        if (val.length === 0) {
+            dropdown.style.display = 'none';
+            dropdown.innerHTML = '';
+            return;
+        }
+
+        gastoDestinoSearchTimer = setTimeout(async () => {
+            try {
+                const res = await fetch(`/api/gastos/buscar-destinos?q=${encodeURIComponent(val)}`, {
+                    headers: { 'Accept': 'application/json' }
+                });
+                const json = await res.json();
+                if (json.ok && Array.isArray(json.data) && json.data.length > 0) {
+                    dropdown.innerHTML = json.data.map(d => `
+                        <div class="ac-item-destino" data-name="${d}" style="padding: 0.65rem 0.9rem; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-between; align-items: center; transition: background 0.15s ease;">
+                            <span style="font-weight: 600; color: #f8fafc; font-size: 0.88rem;">${d}</span>
+                            <span style="color: #c5a043; font-size: 0.72rem; background: rgba(197, 160, 67, 0.12); padding: 2px 6px; border-radius: 4px; font-weight: 600;">Sugerencia</span>
+                        </div>
+                    `).join('');
+
+                    dropdown.style.display = 'block';
+
+                    dropdown.querySelectorAll('.ac-item-destino').forEach(el => {
+                        el.onmouseenter = () => el.style.backgroundColor = 'rgba(197, 160, 67, 0.18)';
+                        el.onmouseleave = () => el.style.backgroundColor = 'transparent';
+                        el.onclick = () => {
+                            inputDestino.value = el.getAttribute('data-name');
+                            dropdown.style.display = 'none';
+                            dropdown.innerHTML = '';
+                            inputDestino.focus();
+                        };
+                    });
+                } else {
+                    dropdown.style.display = 'none';
+                    dropdown.innerHTML = '';
+                }
+            } catch (err) {
+                dropdown.style.display = 'none';
+            }
+        }, 200);
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!inputDestino.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
+}
+
+function setupGastoFormSubmit() {
+    const form = document.getElementById('gasto-form');
+    if (!form || form.dataset.listenerBound) return;
+    form.dataset.listenerBound = 'true';
+
+    form.onsubmit = async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('gasto-id').value;
+        const fecha = document.getElementById('gasto-fecha').value;
+        const tipo = document.getElementById('gasto-tipo').value;
+        const monto = parseFloat(document.getElementById('gasto-monto').value);
+        const destino = document.getElementById('gasto-destino').value.trim();
+        const detalle = document.getElementById('gasto-detalle').value.trim();
+
+        if (!fecha || !tipo || isNaN(monto) || monto <= 0 || !destino) {
+            showToast('Por favor complete todos los campos obligatorios correctamente.', 'error');
+            return;
+        }
+
+        const payload = { fecha, tipo, monto, destino, detalle };
+        const btnSave = document.getElementById('btn-save-gasto');
+        if (btnSave) btnSave.disabled = true;
+
+        try {
+            if (id) {
+                await api.put(`/gastos/${id}`, payload);
+                showToast('Gasto operativo actualizado con éxito.');
+            } else {
+                await api.post('/gastos', payload);
+                showToast('Gasto operativo registrado con éxito.');
+            }
+            closeGastoModal();
+            cargarAuditoriaGastos(auditGastosPage);
+        } catch (err) {
+            showToast(err.message || 'Error al guardar el gasto.', 'error');
+        } finally {
+            if (btnSave) btnSave.disabled = false;
+        }
+    };
+}
+
+async function cargarAuditoriaGastos(page = 1) {
+    auditGastosPage = page;
+    const inicio = document.getElementById('audit-gasto-filter-inicio')?.value || '';
+    const fin = document.getElementById('audit-gasto-filter-fin')?.value || '';
+    const tipo = document.getElementById('audit-gasto-filter-tipo')?.value || '';
+    const buscar = document.getElementById('audit-gasto-filter-buscar')?.value || '';
+
+    const params = new URLSearchParams({ page });
+    if (inicio) params.append('fecha_inicio', inicio);
+    if (fin) params.append('fecha_fin', fin);
+    if (tipo) params.append('tipo', tipo);
+    if (buscar) params.append('buscar', buscar);
+
+    const tbody = document.getElementById('audit-gasto-table-body');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 2rem; color: var(--muted);">Cargando registros...</td></tr>';
+
+    try {
+        const res = await fetch(`/api/gastos?${params.toString()}`, {
+            headers: { 'Accept': 'application/json' }
+        });
+        const resData = await res.json();
+        if (!resData.ok) throw new Error(resData.message || 'Error en respuesta');
+
+        const kpis = resData.kpis || {};
+        const elTotal = document.getElementById('audit-gasto-kpi-total');
+        const elCant = document.getElementById('audit-gasto-kpi-cantidad');
+        const elProm = document.getElementById('audit-gasto-kpi-promedio');
+
+        if (elTotal) elTotal.textContent = `S/ ${(kpis.total_gastos || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        if (elCant) elCant.textContent = kpis.cantidad_registros || 0;
+        if (elProm) elProm.textContent = `S/ ${(kpis.promedio_gasto || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+        const gastos = resData.data?.data || [];
+        currentGastosList = gastos;
+
+        renderMixedTimelineChart('audit-gastos-chart', gastos, 'fecha', 'monto', '#f59e0b', 'Gastos Diarios', auditGastosChartInstance, (inst) => auditGastosChartInstance = inst);
+
+        if (gastos.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 2rem; color: var(--muted);">No se encontraron gastos registrados en este período.</td></tr>';
+            const pag = document.getElementById('audit-gasto-pagination');
+            if (pag) pag.innerHTML = '';
+            return;
+        }
+
+        const tipoBadgeColors = {
+            'Cargadores': { bg: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8' },
+            'Chofer': { bg: 'rgba(168, 85, 247, 0.15)', color: '#c084fc' },
+            'Combustible': { bg: 'rgba(239, 68, 68, 0.15)', color: '#f87171' },
+            'Otros': { bg: 'rgba(148, 163, 184, 0.15)', color: '#94a3b8' },
+            'Reparaciones': { bg: 'rgba(249, 115, 22, 0.15)', color: '#fb923c' },
+            'Repuestos': { bg: 'rgba(234, 179, 8, 0.15)', color: '#facc15' },
+            'Secretaria': { bg: 'rgba(236, 72, 153, 0.15)', color: '#f472b6' },
+            'Viáticos': { bg: 'rgba(34, 197, 94, 0.15)', color: '#4ade80' }
+        };
+
+        tbody.innerHTML = gastos.map(g => {
+            const badge = tipoBadgeColors[g.tipo] || { bg: 'rgba(197, 160, 67, 0.15)', color: '#c5a043' };
+            const fechaStr = g.fecha ? new Date(g.fecha + 'T00:00:00').toLocaleDateString('es-PE') : '-';
+
+            return `
+                <tr style="border-bottom: 1px solid var(--line);">
+                    <td style="padding: 0.85rem 1rem; color: var(--muted);">${fechaStr}</td>
+                    <td style="padding: 0.85rem 1rem;">
+                        <span style="font-size: 0.78rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; background: ${badge.bg}; color: ${badge.color}; display: inline-block;">
+                            ${g.tipo}
+                        </span>
+                    </td>
+                    <td style="padding: 0.85rem 1rem; font-weight: 700; color: var(--text);">
+                        <span style="background: var(--panel-soft); padding: 2px 7px; border-radius: 4px; border: 1px solid var(--line);">
+                            ${g.destino}
+                        </span>
+                    </td>
+                    <td style="padding: 0.85rem 1rem; color: var(--muted); font-size: 0.86rem; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${g.detalle || ''}">
+                        ${g.detalle || '-'}
+                    </td>
+                    <td style="padding: 0.85rem 1rem; font-weight: 700; color: var(--danger); font-family: 'Outfit', sans-serif;">
+                        - S/ ${parseFloat(g.monto || 0).toFixed(2)}
+                    </td>
+                    <td style="padding: 0.85rem 1rem; color: var(--muted); font-size: 0.85rem;">
+                        ${g.user?.name || 'Sistema'}
+                    </td>
+                    <td style="padding: 0.85rem 1rem; text-align: right;">
+                        <div style="display: inline-flex; gap: 0.35rem;">
+                            <button type="button" class="button" data-edit-gasto="${g.id}" style="padding: 0.3rem 0.55rem; font-size: 0.75rem; background: var(--panel-soft); border: 1px solid var(--line); color: var(--text); border-radius: 4px; cursor: pointer;">
+                                Editar
+                            </button>
+                            <button type="button" class="button" data-del-gasto="${g.id}" style="padding: 0.3rem 0.55rem; font-size: 0.75rem; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); color: var(--danger); border-radius: 4px; cursor: pointer;">
+                                Eliminar
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        tbody.querySelectorAll('[data-edit-gasto]').forEach(btn => {
+            btn.onclick = () => {
+                const id = parseInt(btn.getAttribute('data-edit-gasto'));
+                const gasto = currentGastosList.find(item => item.id === id);
+                if (gasto) openGastoModal(gasto);
+            };
+        });
+
+        tbody.querySelectorAll('[data-del-gasto]').forEach(btn => {
+            btn.onclick = () => {
+                const id = parseInt(btn.getAttribute('data-del-gasto'));
+                eliminarGasto(id);
+            };
+        });
+
+        renderAuditPagination('audit-gasto-pagination', resData.data, (newPage) => cargarAuditoriaGastos(newPage));
+    } catch (e) {
+        console.error('Error cargando auditoría de gastos:', e);
+        if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color: var(--danger); padding: 2rem;">Error al consultar datos de gastos operativos.</td></tr>';
+    }
+}
+
+async function eliminarGasto(id) {
+    const ok = await showConfirmModal('¿Estás seguro de que deseas eliminar este registro de gasto operativo?');
+    if (!ok) return;
+
+    try {
+        await api.delete(`/gastos/${id}`);
+        showToast('Gasto operativo eliminado correctamente.');
+        cargarAuditoriaGastos(auditGastosPage);
+    } catch (e) {
+        showToast(e.message || 'Error al eliminar el gasto.', 'error');
+    }
+}
+
+function exportarAuditoriaGastos() {
+    const inicio = document.getElementById('audit-gasto-filter-inicio')?.value || '';
+    const fin = document.getElementById('audit-gasto-filter-fin')?.value || '';
+    const tipo = document.getElementById('audit-gasto-filter-tipo')?.value || '';
+    const buscar = document.getElementById('audit-gasto-filter-buscar')?.value || '';
+
+    const params = new URLSearchParams();
+    if (inicio) params.append('fecha_inicio', inicio);
+    if (fin) params.append('fecha_fin', fin);
+    if (tipo) params.append('tipo', tipo);
+    if (buscar) params.append('buscar', buscar);
+
+    window.location.href = `/api/gastos/export?${params.toString()}`;
 }
 
 function renderMixedTimelineChart(canvasId, records, dateField, amountField, barColor, labelName, currentChartInstance, setChartInstance) {

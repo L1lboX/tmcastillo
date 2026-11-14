@@ -484,12 +484,15 @@
                     </div>
 
                     <!-- Pestañas Superiores -->
-                    <div style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--line); padding-bottom: 0.5rem;">
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--line); padding-bottom: 0.5rem; flex-wrap: wrap;">
                         <button type="button" id="tab-btn-audit-transportistas" class="button" style="background: var(--accent); color: #000; font-weight: 700; border-radius: 8px; border: none; padding: 0.6rem 1.2rem; cursor: pointer;">
                             Egresos: Pagos a Transportistas
                         </button>
                         <button type="button" id="tab-btn-audit-cobros" class="button" style="background: var(--panel-soft); color: var(--muted); font-weight: 600; border-radius: 8px; border: 1px solid var(--line); padding: 0.6rem 1.2rem; cursor: pointer;">
                             Ingresos: Cobranzas a Clientes
+                        </button>
+                        <button type="button" id="tab-btn-audit-gastos" class="button" style="background: var(--panel-soft); color: var(--muted); font-weight: 600; border-radius: 8px; border: 1px solid var(--line); padding: 0.6rem 1.2rem; cursor: pointer;">
+                            Egresos: Gastos Operativos
                         </button>
                     </div>
 
@@ -653,6 +656,108 @@
                             <div id="audit-cobro-pagination" style="display: flex; justify-content: flex-end; gap: 0.5rem; padding: 0.75rem 1rem; background: var(--panel-soft); border-top: 1px solid var(--line);"></div>
                         </div>
                     </div>
+
+                    <!-- ================= CONTENIDO PESTAÑA 3: GASTOS OPERATIVOS ================= -->
+                    <div id="audit-tab-gastos-content" class="hidden">
+                        <!-- Cabecera de acción rápido arriba de KPIs -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+                            <div>
+                                <span style="font-weight: 700; color: var(--text); font-size: 1.1rem; font-family: 'Outfit', sans-serif;">Control de Gastos Diarios</span>
+                                <span style="color: var(--muted); font-size: 0.85rem; display: block;">Flota, combustible, reparaciones, viáticos y personal</span>
+                            </div>
+                            <button type="button" class="button" id="audit-gasto-btn-nuevo" style="background: var(--accent); color: #000; font-weight: 700; border-radius: 8px; border: none; padding: 0.6rem 1.2rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
+                                <span class="material-icon" style="font-size: 1.1rem;">add_circle</span>
+                                Registrar Gasto
+                            </button>
+                        </div>
+
+                        <!-- KPIs -->
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+                            <div style="background: var(--panel); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--line); border-top: 3px solid var(--danger);">
+                                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600;">Total Gastos Operativos</span>
+                                <div style="margin-top: 0.5rem; font-size: 1.7rem; font-weight: 800; color: var(--danger);" id="audit-gasto-kpi-total">S/ 0.00</div>
+                                <small style="color: var(--faint);">Egresos del período</small>
+                            </div>
+                            <div style="background: var(--panel); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--line); border-top: 3px solid var(--blue);">
+                                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600;">Registros de Gasto</span>
+                                <div style="margin-top: 0.5rem; font-size: 1.7rem; font-weight: 800; color: var(--text);" id="audit-gasto-kpi-cantidad">0</div>
+                                <small style="color: var(--faint);">Comprobantes / Vouchers</small>
+                            </div>
+                            <div style="background: var(--panel); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--line); border-top: 3px solid var(--accent);">
+                                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600;">Promedio por Gasto</span>
+                                <div style="margin-top: 0.5rem; font-size: 1.7rem; font-weight: 800; color: var(--accent);" id="audit-gasto-kpi-promedio">S/ 0.00</div>
+                                <small style="color: var(--faint);">Costo promedio unitario</small>
+                            </div>
+                        </div>
+
+                        <!-- Filtros Rápidos -->
+                        <div style="background: var(--panel); padding: 1rem; border-radius: 10px; border: 1px solid var(--line); margin-bottom: 1.25rem; display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap;">
+                            <div style="flex: 2; min-width: 220px;">
+                                <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.35rem;">Buscar (Destino o Detalle)</label>
+                                <input id="audit-gasto-filter-buscar" type="text" class="input" placeholder="Ej. ANI760, BORJA YOVA, combustible..." autocomplete="off" style="width: 100%; background: var(--panel-soft); color: var(--text); border: 1px solid var(--line);">
+                            </div>
+                            <div style="flex: 1; min-width: 150px;">
+                                <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.35rem;">Tipo de Gasto</label>
+                                <select id="audit-gasto-filter-tipo" class="input" style="width: 100%; background: var(--panel-soft); color: var(--text); border: 1px solid var(--line);">
+                                    <option value="">Todos los tipos</option>
+                                    <option value="Cargadores">Cargadores</option>
+                                    <option value="Chofer">Chofer</option>
+                                    <option value="Combustible">Combustible</option>
+                                    <option value="Otros">Otros</option>
+                                    <option value="Reparaciones">Reparaciones</option>
+                                    <option value="Repuestos">Repuestos</option>
+                                    <option value="Secretaria">Secretaria</option>
+                                    <option value="Viáticos">Viáticos</option>
+                                </select>
+                            </div>
+                            <div style="flex: 1; min-width: 140px;">
+                                <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.35rem;">Desde</label>
+                                <input id="audit-gasto-filter-inicio" type="date" class="input" style="width: 100%; background: var(--panel-soft); color: var(--text); border: 1px solid var(--line);">
+                            </div>
+                            <div style="flex: 1; min-width: 140px;">
+                                <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.35rem;">Hasta</label>
+                                <input id="audit-gasto-filter-fin" type="date" class="input" style="width: 100%; background: var(--panel-soft); color: var(--text); border: 1px solid var(--line);">
+                            </div>
+                            <button class="button" id="audit-gasto-btn-filtrar" type="button" style="background: var(--accent); color: #000; font-weight: 700; border: none; padding: 0.55rem 1.2rem; border-radius: 6px;">
+                                Filtrar
+                            </button>
+                            <button class="button" id="audit-gasto-btn-export" type="button" style="background: var(--panel-soft); color: var(--text); font-weight: 600; border: 1px solid var(--line); padding: 0.55rem 1.2rem; border-radius: 6px; display: inline-flex; align-items: center; gap: 0.4rem;">
+                                Exportar Excel
+                            </button>
+                        </div>
+
+                        <!-- Gráfico Timeline Mixto Gastos -->
+                        <div style="background: var(--panel); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--line); margin-bottom: 1.25rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                                <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text);">Evolución de Gastos Operativos</h4>
+                                <small style="color: var(--muted);">Desembolsos diarios vs. Línea dorada de acumulación</small>
+                            </div>
+                            <div style="height: 260px; position: relative;">
+                                <canvas id="audit-gastos-chart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Tabla -->
+                        <div class="table-shell" style="border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--panel);">
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="background: var(--panel-soft); text-align: left; border-bottom: 1px solid var(--line);">
+                                        <th style="padding: 0.75rem 1rem; color: var(--muted);">Fecha</th>
+                                        <th style="padding: 0.75rem 1rem; color: var(--muted);">Tipo</th>
+                                        <th style="padding: 0.75rem 1rem; color: var(--muted);">Destino</th>
+                                        <th style="padding: 0.75rem 1rem; color: var(--muted);">Detalle</th>
+                                        <th style="padding: 0.75rem 1rem; color: var(--muted);">Monto</th>
+                                        <th style="padding: 0.75rem 1rem; color: var(--muted);">Registrado por</th>
+                                        <th style="padding: 0.75rem 1rem; color: var(--muted); text-align: right;">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="audit-gasto-table-body">
+                                    <tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--muted);">Cargando gastos...</td></tr>
+                                </tbody>
+                            </table>
+                            <div id="audit-gasto-pagination" style="display: flex; justify-content: flex-end; gap: 0.5rem; padding: 0.75rem 1rem; background: var(--panel-soft); border-top: 1px solid var(--line);"></div>
+                        </div>
+                    </div>
                 </section>
 
                 <section class="module-page{{ auth()->user()->cannot('dashboard.view') ? ' hidden' : '' }}" data-page="dashboard">
@@ -695,15 +800,15 @@
                         </div>
 
                         <div style="background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px;">
-                            <span style="color: var(--muted); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Costo de Fletes</span>
+                            <span style="color: var(--muted); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Egresos Totales</span>
                             <div id="kpi-costos" style="font-size: 1.65rem; font-weight: 700; color: var(--danger); margin-top: 6px; font-family: 'Outfit', sans-serif;">S/ 0.00</div>
-                            <div style="font-size: 0.8rem; color: var(--faint); margin-top: 4px;">Pago a transportistas</div>
+                            <div id="kpi-costos-sub" style="font-size: 0.8rem; color: var(--faint); margin-top: 4px;">Fletes + Gastos diarios</div>
                         </div>
 
                         <div style="background: var(--panel); border: 1px solid rgba(74, 222, 128, 0.3); border-radius: 10px; padding: 18px;">
-                            <span style="color: var(--success); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Utilidad Operativa</span>
+                            <span style="color: var(--success); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Utilidad Real</span>
                             <div id="kpi-utilidad" style="font-size: 1.65rem; font-weight: 700; color: var(--success); margin-top: 6px; font-family: 'Outfit', sans-serif;">S/ 0.00</div>
-                            <div style="font-size: 0.8rem; color: var(--muted); margin-top: 4px;">Margen bruto neto</div>
+                            <div style="font-size: 0.8rem; color: var(--muted); margin-top: 4px;">Ingresos - Egresos Totales</div>
                         </div>
 
                         <div style="background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px;">
@@ -717,8 +822,8 @@
                     <div style="background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px; margin-bottom: 24px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                             <div>
-                                <h3 style="margin: 0; font-size: 1.05rem; color: var(--text); font-family: 'Outfit', sans-serif;">Evolución Diaria: Ingresos vs. Fletes</h3>
-                                <span id="dash-chart-subtitle" style="font-size: 0.8rem; color: var(--muted);">Comparativo de rendimiento operativo</span>
+                                <h3 style="margin: 0; font-size: 1.05rem; color: var(--text); font-family: 'Outfit', sans-serif;">Evolución Diaria: Ingresos vs. Egresos Totales</h3>
+                                <span id="dash-chart-subtitle" style="font-size: 0.8rem; color: var(--muted);">Comparativo de ingresos, fletes, gastos y utilidad real</span>
                             </div>
                         </div>
                         <div style="position: relative; height: 300px; width: 100%;">
@@ -1580,6 +1685,68 @@
                 <button class="button button-with-icon icon-close" id="btn-close-alquiler-details" type="button">Cerrar</button>
             </header>
             <div class="modal-body details-body" id="alquiler-details-body"></div>
+        </section>
+    </div>
+
+    <!-- ================= MODAL: REGISTRAR / EDITAR GASTO OPERATIVO ================= -->
+    <div class="modal-backdrop" id="gasto-modal" aria-hidden="true">
+        <section class="modal modal-small" role="dialog" aria-modal="true" aria-labelledby="gasto-modal-title" style="max-width: 540px; width: 95%;">
+            <header class="modal-head">
+                <h2 id="gasto-modal-title">Registrar Gasto Operativo</h2>
+                <button class="button button-with-icon icon-close" id="btn-close-gasto-modal" type="button">Cerrar</button>
+            </header>
+
+            <form id="gasto-form" class="modal-body" style="display: flex; flex-direction: column; gap: 1rem;">
+                <input type="hidden" id="gasto-id">
+
+                <div class="form-grid two">
+                    <label>
+                        <span>Fecha *</span>
+                        <input id="gasto-fecha" type="date" required class="input" style="width: 100%;">
+                    </label>
+
+                    <label>
+                        <span>Tipo de Gasto *</span>
+                        <select id="gasto-tipo" required class="input" style="width: 100%;">
+                            <option value="">Seleccione tipo...</option>
+                            <option value="Cargadores">Cargadores</option>
+                            <option value="Chofer">Chofer</option>
+                            <option value="Combustible">Combustible</option>
+                            <option value="Otros">Otros</option>
+                            <option value="Reparaciones">Reparaciones</option>
+                            <option value="Repuestos">Repuestos</option>
+                            <option value="Secretaria">Secretaria</option>
+                            <option value="Viáticos">Viáticos</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div class="form-grid two">
+                    <label>
+                        <span>Monto (S/) *</span>
+                        <input id="gasto-monto" type="number" step="0.01" min="0.01" required placeholder="0.00" class="input" style="width: 100%;">
+                    </label>
+
+                    <div style="position: relative;">
+                        <label>
+                            <span>Destino *</span>
+                            <input id="gasto-destino" type="text" required placeholder="Ej: ANI760 o BORJA YOVA" class="input" style="width: 100%;" autocomplete="off">
+                        </label>
+                        <!-- Sugerencias integradas flotantes (máx. 3 más parecidos) -->
+                        <div id="gasto-destino-autocomplete-list" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #0b1120; border: 1px solid rgba(197, 160, 67, 0.5); border-radius: 8px; box-shadow: 0 12px 30px rgba(0,0,0,0.85); z-index: 100; max-height: 200px; overflow-y: auto;"></div>
+                    </div>
+                </div>
+
+                <label>
+                    <span>Detalle (Opcional)</span>
+                    <textarea id="gasto-detalle" rows="2" placeholder="Observaciones o descripción adicional..." class="input" style="width: 100%; resize: vertical;"></textarea>
+                </label>
+
+                <footer class="modal-actions" style="margin-top: 0.5rem; display: flex; justify-content: flex-end; gap: 0.5rem;">
+                    <button class="button button-with-icon icon-cancel" id="btn-cancel-gasto-modal" type="button">Cancelar</button>
+                    <button class="button button-primary button-with-icon icon-save" type="submit" id="btn-save-gasto">Guardar Gasto</button>
+                </footer>
+            </form>
         </section>
     </div>
 

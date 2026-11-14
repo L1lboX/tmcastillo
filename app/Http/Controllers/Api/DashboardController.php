@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Envio;
 use App\Models\EnvioItem;
 use App\Models\Alquiler;
+use App\Models\Gasto;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Http\JsonResponse;
@@ -58,11 +59,22 @@ class DashboardController extends Controller
             ')
             ->first();
 
-        // 1.2 Suma Maestra
-        $ingresos = (float) ($metricas->total_ingresos ?? 0) + (float) ($metricasAlquiler->total_ingresos ?? 0);
-        $fletes = (float) ($metricas->total_fletes ?? 0);
-        $utilidad = $ingresos - $fletes;
-        $margenPct = $ingresos > 0 ? round(($utilidad / $ingresos) * 100, 1) : 0.0;
+        // 1.2 Totales y KPIs de Gastos Operativos (Gastos Diarios)
+        $metricasGastos = Gasto::query()
+            ->whereBetween('fecha', [$desde, $hasta])
+            ->selectRaw('
+                COUNT(id) as total_gastos,
+                COALESCE(SUM(monto), 0) as total_gastos_monto
+            ')
+            ->first();
+
+        // 1.3 Suma Maestra (Nuevos Egresos Totales y Utilidad Real)
+        $ingresos       = (float) ($metricas->total_ingresos ?? 0) + (float) ($metricasAlquiler->total_ingresos ?? 0);
+        $fletes         = (float) ($metricas->total_fletes ?? 0);
+        $gastosDiarios  = (float) ($metricasGastos->total_gastos_monto ?? 0);
+        $egresosTotales = $fletes + $gastosDiarios;
+        $utilidadReal   = $ingresos - $egresosTotales;
+        $margenPct      = $ingresos > 0 ? round(($utilidadReal / $ingresos) * 100, 1) : 0.0;
         
         $totalOperaciones = (int) ($metricas->total_envios ?? 0) + (int) ($metricasAlquiler->total_alquileres ?? 0);
 
@@ -91,26 +103,45 @@ class DashboardController extends Controller
             ->get()
             ->keyBy(fn($row) => Carbon::parse($row->fecha)->toDateString());
 
-        $chartLabels = [];
-        $chartIngresos = [];
-        $chartFletes = [];
-        $chartGanancia = [];
+        // 2.2 Serie diaria (Gastos Diarios)
+        $serieDiariaGastos = Gasto::query()
+            ->whereBetween('fecha', [$desde, $hasta])
+            ->groupBy('fecha')
+            ->selectRaw('
+                fecha,
+                COALESCE(SUM(monto), 0) as gasto
+            ')
+            ->get()
+            ->keyBy(fn($row) => Carbon::parse($row->fecha)->toDateString());
+
+        $chartLabels         = [];
+        $chartIngresos       = [];
+        $chartFletes         = [];
+        $chartGastos         = [];
+        $chartEgresosTotales = [];
+        $chartGanancia       = [];
 
         foreach (CarbonPeriod::create($desde, $hasta) as $dia) {
             $fStr = $dia->toDateString();
             
             $item = $serieDiaria->get($fStr);
             $itemAlq = $serieDiariaAlquiler->get($fStr);
+            $itemGasto = $serieDiariaGastos->get($fStr);
             
             $chartLabels[] = ucfirst($dia->isoFormat('ddd D'));
             
             // Sumamos los ingresos de envíos y alquileres para el mismo día
             $ing = ((float) ($item->ingreso ?? 0)) + ((float) ($itemAlq->ingreso ?? 0));
             $fle = (float) ($item->flete ?? 0);
+            $gas = (float) ($itemGasto->gasto ?? 0);
+            $egr = $fle + $gas;
+            $utl = $ing - $egr;
             
-            $chartIngresos[] = round($ing, 2);
-            $chartFletes[] = round($fle, 2);
-            $chartGanancia[] = round($ing - $fle, 2);
+            $chartIngresos[]       = round($ing, 2);
+            $chartFletes[]         = round($fle, 2);
+            $chartGastos[]         = round($gas, 2);
+            $chartEgresosTotales[] = round($egr, 2);
+            $chartGanancia[]       = round($utl, 2);
         }
 
         // 3. Top 5 Clientes con mayor deuda 
@@ -155,17 +186,23 @@ class DashboardController extends Controller
                 'preset' => $preset,
             ],
             'kpis' => [
-                'ingresos'     => round($ingresos, 2),
-                'fletes'       => round($fletes, 2),
-                'utilidad'     => round($utilidad, 2),
-                'margen_pct'   => $margenPct,
-                'total_envios' => $totalOperaciones, // Ahora también cuenta los alquileres en el contador visual
+                'ingresos'        => round($ingresos, 2),
+                'fletes'          => round($fletes, 2),
+                'gastos'          => round($gastosDiarios, 2),
+                'egresos_totales' => round($egresosTotales, 2),
+                'utilidad'        => round($utilidadReal, 2),
+                'utilidad_real'   => round($utilidadReal, 2),
+                'margen_pct'      => $margenPct,
+                'total_envios'    => $totalOperaciones, // Ahora también cuenta los alquileres en el contador visual
+                'total_gastos'    => (int) ($metricasGastos->total_gastos ?? 0),
             ],
             'chart' => [
-                'labels'   => $chartLabels,
-                'ingresos' => $chartIngresos,
-                'fletes'   => $chartFletes,
-                'ganancia' => $chartGanancia,
+                'labels'          => $chartLabels,
+                'ingresos'        => $chartIngresos,
+                'fletes'          => $chartFletes,
+                'gastos'          => $chartGastos,
+                'egresos_totales' => $chartEgresosTotales,
+                'ganancia'        => $chartGanancia,
             ],
             'top_deudores'       => $topClientesDeudores,
             'top_transportistas' => $topTransportistasDeuda,
