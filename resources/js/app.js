@@ -286,9 +286,6 @@ function bindEvents() {
     on("#btn-cancel-abono-modal", "click", closeAbonoModal);
     on("#abono-form", "submit", saveAbono);
     on("#btn-close-movements-modal", "click", closeMovementsModal);
-    on("#btn-close-liq-modal", "click", closeLiqModal);
-    on("#btn-cancel-liq-modal", "click", closeLiqModal);
-    on("#btn-liq-all", "click", liqAll);
     on("#btn-close-gestion", "click", closeGestion);
     on("#btn-liquidar-deuda", "click", liquidarDeudaTransportista);
 
@@ -356,9 +353,7 @@ function bindEvents() {
     $("#carrier-details-modal")?.addEventListener("click", (event) => {
         if (event.target.id === "carrier-details-modal") closeCarrierDetailsModal();
     });
-    $("#liq-modal")?.addEventListener("click", (event) => {
-        if (event.target.id === "liq-modal") closeLiqModal();
-    });
+    
 
     $("#search-input").addEventListener("input", debounce((event) => setFilter("q", event.target.value.trim()), 250));
     $("#filter-pago").addEventListener("change", (event) => setFilter("pago", event.target.value));
