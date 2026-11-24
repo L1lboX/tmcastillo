@@ -9,6 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('gastos', function (Blueprint $table): void {
+            $table->engine = 'InnoDB';
             $table->id();
             $table->date('fecha');
             $table->string('tipo', 50);
