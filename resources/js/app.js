@@ -312,52 +312,9 @@ function bindEvents() {
             modal.setAttribute("aria-hidden", "true");
         }
     });
-    $("#pago-detalle-modal")?.addEventListener("click", (event) => {
-        if (event.target.id === "pago-detalle-modal") {
-            const modal = $("#pago-detalle-modal");
-            modal.classList.remove("is-active");
-            modal.setAttribute("aria-hidden", "true");
-        }
-    });
 
     on("#btn-export", "click", exportEnvios);
     on("#btn-clear-filters", "click", clearFilters);
-    $("#envio-modal")?.addEventListener("click", (event) => {
-        if (event.target.id === "envio-modal") closeModal();
-    });
-    $("#client-modal")?.addEventListener("click", (event) => {
-        if (event.target.id === "client-modal") closeClientModal();
-    });
-    $("#carrier-modal")?.addEventListener("click", (event) => {
-        if (event.target.id === "carrier-modal") closeCarrierModal();
-    });
-    $("#user-modal")?.addEventListener("click", (event) => {
-        if (event.target.id === "user-modal") closeUserModal();
-    });
-    $("#role-modal")?.addEventListener("click", (event) => {
-        if (event.target.id === "role-modal") closeRoleModal();
-    });
-    $("#amount-modal")?.addEventListener("click", (event) => {
-        if (event.target.id === "amount-modal") closeAmountModal();
-    });
-    $("#abono-modal")?.addEventListener("click", (event) => {
-        if (event.target.id === "abono-modal") closeAbonoModal();
-    });
-    $("#movements-modal")?.addEventListener("click", (event) => {
-        if (event.target.id === "movements-modal") closeMovementsModal();
-    });
-    $("#details-modal")?.addEventListener("click", (event) => {
-        if (event.target.id === "details-modal") closeDetailsModal();
-    });
-    $("#items-modal")?.addEventListener("click", (event) => {
-        if (event.target.id === "items-modal") closeItemsModal();
-    });
-    $("#carrier-details-modal")?.addEventListener("click", (event) => {
-        if (event.target.id === "carrier-details-modal") closeCarrierDetailsModal();
-    });
-    $("#gasto-modal")?.addEventListener("click", (event) => {
-        if (event.target.id === "gasto-modal") closeGastoModal();
-    });
     
 
     $("#search-input").addEventListener("input", debounce((event) => setFilter("q", event.target.value.trim()), 250));
@@ -2708,10 +2665,6 @@ function bindMaquinariaEvents() {
         );
         renderMaquinariasTable(filtered);
     }, 250));
-
-    $("#maquinaria-modal")?.addEventListener("click", (event) => {
-        if (event.target.id === "maquinaria-modal") closeMaquinariaModal();
-    });
 }
 
 async function loadMaquinarias() {
@@ -2835,13 +2788,6 @@ function bindAlquilerEvents() {
     on("#btn-cancel-alquiler", "click", closeAlquilerModal);
     on("#btn-close-alquiler-details", "click", closeAlquilerDetailsModal);
     on("#alquiler-form", "submit", saveAlquiler);
-
-    $("#alquiler-modal")?.addEventListener("click", (event) => {
-        if (event.target.id === "alquiler-modal") closeAlquilerModal();
-    });
-    $("#alquiler-details-modal")?.addEventListener("click", (event) => {
-        if (event.target.id === "alquiler-details-modal") closeAlquilerDetailsModal();
-    });
 
     on("#alquiler-tiempo", "input", calcularPreviewAlquiler);
     on("#alquiler-precio", "input", calcularPreviewAlquiler);
@@ -3428,11 +3374,13 @@ async function loadDashboardGanancias() {
                             label: 'Utilidad Real (S/)',
                             data: data.chart.ganancia,
                             type: 'line',
-                            borderColor: '#c5a043',
-                            backgroundColor: '#c5a043',
-                            borderWidth: 2,
-                            pointRadius: 4,
-                            pointBackgroundColor: '#c5a043',
+                            borderColor: '#4ade80',
+                            backgroundColor: '#4ade80',
+                            borderWidth: 2.5,
+                            pointRadius: 4.5,
+                            pointBackgroundColor: '#4ade80',
+                            pointBorderColor: '#0b1120',
+                            pointBorderWidth: 1.5,
                             fill: false,
                             tension: 0.3,
                             order: 1,
@@ -3930,6 +3878,7 @@ async function cargarAuditoriaGastos(page = 1) {
             'Chofer': { bg: 'rgba(168, 85, 247, 0.15)', color: '#c084fc' },
             'Combustible': { bg: 'rgba(239, 68, 68, 0.15)', color: '#f87171' },
             'Otros': { bg: 'rgba(148, 163, 184, 0.15)', color: '#94a3b8' },
+            'Préstamo': { bg: 'rgba(139, 92, 246, 0.15)', color: '#a78bfa' },
             'Reparaciones': { bg: 'rgba(249, 115, 22, 0.15)', color: '#fb923c' },
             'Repuestos': { bg: 'rgba(234, 179, 8, 0.15)', color: '#facc15' },
             'Secretaria': { bg: 'rgba(236, 72, 153, 0.15)', color: '#f472b6' },

@@ -533,8 +533,15 @@ class EnvioController extends Controller
             'items.*.monto.min' => 'El monto del item no puede ser negativo.',
         ]);
 
+        $codigo = trim((string) ($validated['codigo'] ?? ''));
+        if ($envio) {
+            $codigo = $codigo !== '' ? $codigo : $envio->codigo;
+        } elseif ($codigo === '' || Envio::query()->where('codigo', $codigo)->exists()) {
+            $codigo = $this->nextCode();
+        }
+
         $data = [
-            'codigo' => trim((string) ($validated['codigo'] ?? '')) ?: $this->nextCode(),
+            'codigo' => $codigo,
             'fecha' => $validated['fecha'],
             'transportista_id' => $validated['transportista_id'],
             'guia' => strtoupper(trim($validated['guia'])),
@@ -550,7 +557,13 @@ class EnvioController extends Controller
 
     private function nextCode(): string
     {
-        $next = ((int) Envio::query()->max('id')) + 1;
+        $maxNumber = Envio::query()
+            ->where('codigo', 'like', 'ENV-%')
+            ->pluck('codigo')
+            ->map(fn (string $codigo): int => preg_match('/^ENV-(\d+)$/', $codigo, $m) ? (int) $m[1] : 0)
+            ->max() ?? 0;
+
+        $next = $maxNumber + 1;
 
         return 'ENV-'.str_pad((string) $next, 4, '0', STR_PAD_LEFT);
     }

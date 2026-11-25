@@ -704,6 +704,7 @@
                                     <option value="Chofer">Chofer</option>
                                     <option value="Combustible">Combustible</option>
                                     <option value="Otros">Otros</option>
+                                    <option value="Préstamo">Préstamo</option>
                                     <option value="Reparaciones">Reparaciones</option>
                                     <option value="Repuestos">Repuestos</option>
                                     <option value="Secretaria">Secretaria</option>
@@ -1713,6 +1714,7 @@
                             <option value="Chofer">Chofer</option>
                             <option value="Combustible">Combustible</option>
                             <option value="Otros">Otros</option>
+                            <option value="Préstamo">Préstamo</option>
                             <option value="Reparaciones">Reparaciones</option>
                             <option value="Repuestos">Repuestos</option>
                             <option value="Secretaria">Secretaria</option>

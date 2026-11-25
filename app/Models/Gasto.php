@@ -14,6 +14,7 @@ class Gasto extends Model
         'Chofer',
         'Combustible',
         'Otros',
+        'Préstamo',
         'Reparaciones',
         'Repuestos',
         'Secretaria',
